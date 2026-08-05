@@ -1,0 +1,86 @@
+.bbox-editor {
+  display: inline-block;
+}
+
+.tool-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tool-btn {
+  background: transparent;
+  color: var(--text-h);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.tool-btn-active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.bbox-canvas {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #333;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.bbox-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.bbox-shape {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke-width: 2;
+}
+
+.bbox-draft {
+  stroke: #ffffff;
+  stroke-dasharray: 5 4;
+  fill: rgba(255, 255, 255, 0.08);
+}
+
+.bbox-controls {
+  position: absolute;
+  height: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bbox-label {
+  font-size: 11px;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bbox-remove {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0;
+}
+
+.bbox-hint {
+  font-size: 13px;
+  color: #888;
+  margin-top: 6px;
+}
