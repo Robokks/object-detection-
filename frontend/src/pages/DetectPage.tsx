@@ -178,27 +178,35 @@ export default function DetectPage() {
                   <th>Class</th>
                   <th>Shape</th>
                   <th>Confidence</th>
-                  <th>X</th>
-                  <th>Y</th>
+                  <th>Position (X, Y)</th>
+                  <th>Box X</th>
+                  <th>Box Y</th>
                   <th>Width</th>
                   <th>Height</th>
                 </tr>
               </thead>
               <tbody>
-                {result.boxes.map((b, i) => (
-                  <tr key={i}>
-                    <td>{b.class_name}</td>
-                    <td>{b.points.length >= 3 ? "mask" : "box"}</td>
-                    <td>{b.confidence != null ? `${(b.confidence * 100).toFixed(1)}%` : "-"}</td>
-                    <td>{b.x.toFixed(0)}</td>
-                    <td>{b.y.toFixed(0)}</td>
-                    <td>{b.width.toFixed(0)}</td>
-                    <td>{b.height.toFixed(0)}</td>
-                  </tr>
-                ))}
+                {result.boxes.map((b, i) => {
+                  const cx = b.center_x ?? b.x + b.width / 2;
+                  const cy = b.center_y ?? b.y + b.height / 2;
+                  return (
+                    <tr key={i}>
+                      <td>{b.class_name}</td>
+                      <td>{b.points.length >= 3 ? "mask" : "box"}</td>
+                      <td>{b.confidence != null ? `${(b.confidence * 100).toFixed(1)}%` : "-"}</td>
+                      <td className="position-cell">
+                        ({cx.toFixed(0)}, {cy.toFixed(0)})
+                      </td>
+                      <td>{b.x.toFixed(0)}</td>
+                      <td>{b.y.toFixed(0)}</td>
+                      <td>{b.width.toFixed(0)}</td>
+                      <td>{b.height.toFixed(0)}</td>
+                    </tr>
+                  );
+                })}
                 {result.boxes.length === 0 && (
                   <tr>
-                    <td colSpan={7}>No objects detected above the confidence threshold.</td>
+                    <td colSpan={8}>No objects detected above the confidence threshold.</td>
                   </tr>
                 )}
               </tbody>

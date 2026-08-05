@@ -1,4 +1,4 @@
-export type ShapeKind = "box" | "ellipse" | "polygon";
+export type ShapeKind = "box" | "ellipse" | "polygon" | "rotated_box";
 
 export interface Shape {
   class_name: string;
@@ -9,6 +9,9 @@ export interface Shape {
   y: number;
   width: number;
   height: number;
+  /** Object position (bounding-box center) — stays meaningful regardless of rotation. Server-computed. */
+  center_x?: number;
+  center_y?: number;
 }
 
 export interface DatasetInfo {

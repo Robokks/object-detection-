@@ -266,3 +266,8 @@ button:disabled {
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
 }
+
+.position-cell {
+  font-weight: 600;
+  color: var(--text-h);
+}

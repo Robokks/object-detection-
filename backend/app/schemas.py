@@ -1,8 +1,8 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-ShapeKind = Literal["box", "ellipse", "polygon"]
+ShapeKind = Literal["box", "ellipse", "polygon", "rotated_box"]
 ModelTask = Literal["detect", "segment", "sam"]
 ModelSource = Literal["pretrained", "trained", "imported"]
 
@@ -12,8 +12,12 @@ class Shape(BaseModel):
 
     `x`/`y`/`width`/`height` are always the axis-aligned bounding box of the
     shape. `points` additionally carries the outline for non-box shapes
-    (ellipse: a sampled ring; polygon: the freehand path) so the exact
-    region can be re-drawn and exported as a YOLO-seg polygon label.
+    (ellipse: a sampled ring; polygon/rotated_box: the outline corners) so
+    the exact region can be re-drawn and exported as a YOLO-seg polygon
+    label. `center_x`/`center_y` is the object's position — the bounding
+    box's center, which (unlike its top-left corner) stays meaningful
+    regardless of the object's rotation. Server-computed; any value sent by
+    a client is ignored and overwritten.
     """
 
     class_name: str
@@ -24,6 +28,14 @@ class Shape(BaseModel):
     y: float = Field(..., description="Bounding box top-left y in pixels")
     width: float = Field(..., description="Bounding box width in pixels")
     height: float = Field(..., description="Bounding box height in pixels")
+    center_x: float = 0.0
+    center_y: float = 0.0
+
+    @model_validator(mode="after")
+    def _compute_center(self) -> "Shape":
+        self.center_x = self.x + self.width / 2
+        self.center_y = self.y + self.height / 2
+        return self
 
 
 class SaveAnnotationsRequest(BaseModel):

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from app.schemas import ModelInfo, ModelTask
 from app.services import model_service
@@ -20,6 +21,10 @@ async def import_model(
 ):
     content = await file.read()
     try:
-        return model_service.import_model(file.filename or "model.pt", content, label, task)
+        # Validating the checkpoint means loading it, which can take a
+        # while for larger models — keep it off the event loop.
+        return await run_in_threadpool(
+            model_service.import_model, file.filename or "model.pt", content, label, task
+        )
     except ModelError as e:
         raise HTTPException(status_code=400, detail=str(e))

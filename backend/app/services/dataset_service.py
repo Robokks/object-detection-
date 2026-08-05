@@ -148,7 +148,9 @@ def save_annotations(
             shape.width,
             shape.height,
         )
-        stored = shape.model_copy(update={"x": x, "y": y, "width": w, "height": h})
+        stored = shape.model_copy(
+            update={"x": x, "y": y, "width": w, "height": h, "center_x": x + w / 2, "center_y": y + h / 2}
+        )
         stored_shapes.append(stored.model_dump())
 
         class_idx = classes.index(shape.class_name)

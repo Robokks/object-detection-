@@ -8,7 +8,11 @@ using it to detect objects (class + position) in new images.
   model management, and inference.
 - **Frontend** (`frontend/`): React + Vite (TypeScript). Three screens:
   1. **Dataset** — create a dataset, upload images, and label objects with a
-     **box**, **ellipse**, or **pen** (freehand) tool.
+     **box**, **rotated box**, **ellipse**, or **pen** (freehand) tool. The
+     rotated box is the one to reach for on elongated objects that can appear
+     at any angle (rods, pins, tools): drag to size, then drag its handle to
+     match the object's orientation — much tighter than an axis-aligned box,
+     and much faster than tracing freehand.
   2. **Train** — fine-tune a pretrained YOLOv8 checkpoint on your labeled
      dataset, or train a fresh model from scratch. Training runs in the
      background with live progress.
@@ -22,10 +26,13 @@ using it to detect objects (class + position) in new images.
 ### Labeling
 
 Datasets are stored on disk as images + per-image shapes drawn in the
-browser (box, ellipse, or freehand polygon). Every shape's outline —
-including plain boxes, treated as 4-point outlines — is exported as a
-YOLO-seg polygon label at training time, split into train/val sets
-automatically.
+browser (box, rotated box, ellipse, or freehand polygon). Every shape's
+outline — including plain and rotated boxes, both just 4-point outlines —
+is exported as a YOLO-seg polygon label at training time, split into
+train/val sets automatically. This is what makes the rotated box tool
+worthwhile: an axis-aligned box around a diagonal object is mostly
+background, which is a weak training signal; the rotated outline is tight
+regardless of angle.
 
 ### Training
 
@@ -57,9 +64,11 @@ The Detect page's model list combines three sources:
 
 Detection results carry a polygon outline (`points`) whenever the model
 produces a mask (segmentation/SAM); plain detection models return just a
-bounding box. The bounding box (`x`, `y`, `width`, `height`) is always
-populated either way, so "position" is always available regardless of
-model type.
+bounding box. Every result also carries `center_x`/`center_y` — the
+bounding box's center, computed server-side and always populated. That's
+the field to use as an object's "position": unlike the box's top-left
+corner, the center stays meaningful regardless of the object's rotation
+(rotating a box around its own center doesn't move the center).
 
 ## Requirements
 

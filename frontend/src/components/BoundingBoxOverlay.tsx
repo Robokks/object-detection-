@@ -44,6 +44,14 @@ export default function BoundingBoxOverlay({ imageSrc, naturalWidth, naturalHeig
             />
           );
         })}
+        {boxes.map((shape, idx) => {
+          const cx = shape.center_x ?? shape.x + shape.width / 2;
+          const cy = shape.center_y ?? shape.y + shape.height / 2;
+          const color = colorForClass(shape.class_name, classes);
+          return (
+            <circle key={idx} cx={cx * scale} cy={cy * scale} r={4} className="bbox-center-dot" fill={color} />
+          );
+        })}
       </svg>
 
       {boxes.map((shape, idx) => (
