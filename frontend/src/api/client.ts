@@ -72,6 +72,12 @@ export const api = {
       }),
     }),
 
+  suggestShapes: (name: string, imageId: string, className: string) =>
+    request<Shape[]>(
+      `/api/datasets/${encodeURIComponent(name)}/images/${encodeURIComponent(imageId)}/suggest?class_name=${encodeURIComponent(className)}`,
+      { method: "POST" }
+    ),
+
   startTraining: (params: {
     dataset_name: string;
     run_name: string;

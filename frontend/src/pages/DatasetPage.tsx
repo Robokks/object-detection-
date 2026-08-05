@@ -14,6 +14,8 @@ export default function DatasetPage() {
   const [newClassName, setNewClassName] = useState("");
   const [error, setError] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestMessage, setSuggestMessage] = useState("");
 
   async function refreshDatasets(selectName?: string) {
     const list = await api.listDatasets();
@@ -98,6 +100,27 @@ export default function DatasetPage() {
       setError(String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSuggestShapes() {
+    if (!detail || !activeImageId || !selected || !activeClass) return;
+    setSuggesting(true);
+    setSuggestMessage("");
+    setError("");
+    try {
+      const suggested = await api.suggestShapes(selected, activeImageId, activeClass);
+      const image = detail.images[activeImageId];
+      await handleShapesChange([...image.shapes, ...suggested]);
+      setSuggestMessage(
+        suggested.length > 0
+          ? `Found ${suggested.length} candidate(s), labeled "${activeClass}" — review below and delete any that aren't real.`
+          : "No candidates found on this image."
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSuggesting(false);
     }
   }
 
@@ -201,6 +224,17 @@ export default function DatasetPage() {
           {activeImage && (
             <section className="card">
               <h3>Label image {saving && <span className="saving-badge">saving…</span>}</h3>
+              <div className="suggest-row">
+                <button onClick={handleSuggestShapes} disabled={!activeClass || suggesting}>
+                  {suggesting ? "Scanning…" : "Suggest cylinders"}
+                </button>
+                <p className="page-desc suggest-hint">
+                  Looks for the dark → glare → dark pattern a flash makes on a cylindrical surface, and proposes
+                  rotated boxes labeled <strong>{activeClass || "(select a class)"}</strong>. Works best when
+                  objects don't overlap; review and delete any bad suggestions below.
+                </p>
+              </div>
+              {suggestMessage && <p className="suggest-message">{suggestMessage}</p>}
               <BoundingBoxEditor
                 imageSrc={imageUrl(selected, activeImageId)}
                 naturalWidth={activeImage.width}

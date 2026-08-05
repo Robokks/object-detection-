@@ -12,7 +12,9 @@ using it to detect objects (class + position) in new images.
      rotated box is the one to reach for on elongated objects that can appear
      at any angle (rods, pins, tools): drag to size, then drag its handle to
      match the object's orientation — much tighter than an axis-aligned box,
-     and much faster than tracing freehand.
+     and much faster than tracing freehand. A **"Suggest cylinders"** button
+     runs a classical image-processing pass that proposes rotated boxes for
+     you to review (see below).
   2. **Train** — fine-tune a pretrained YOLOv8 checkpoint on your labeled
      dataset, or train a fresh model from scratch. Training runs in the
      background with live progress.
@@ -33,6 +35,23 @@ train/val sets automatically. This is what makes the rotated box tool
 worthwhile: an axis-aligned box around a diagonal object is mostly
 background, which is a weak training signal; the rotated outline is tight
 regardless of angle.
+
+### Auto-suggested labels
+
+Photographed under a flash, a cylindrical object (rod, pin, roller) tends to
+show a bright specular highlight running down its length, flanked by
+darker surface on both sides — a dark → glare → dark cross-section. The
+**"Suggest cylinders"** button (Dataset page) scans the active image for
+that pattern with classical image processing (OpenCV: brightness
+thresholding, connected components, oriented bounding rects — no ML
+involved, no training data needed) and adds each candidate as an editable
+rotated-box shape labeled with the currently selected class.
+
+This is a heuristic, not a classifier — review its output before training
+on it. It works best when objects are separated; where they touch or cross,
+it tends to merge them into one coarse box. Delete anything wrong the same
+way you'd delete a hand-drawn shape; accepted candidates are saved exactly
+like any other annotation.
 
 ### Training
 
@@ -114,6 +133,7 @@ both the backend and frontend at the same time.
 | `GET /api/datasets` | List datasets with image/annotation counts |
 | `POST /api/datasets/{name}/images` | Upload an image to a dataset |
 | `POST /api/datasets/{name}/annotations` | Save labeled shapes for an image |
+| `POST /api/datasets/{name}/images/{image_id}/suggest` | Auto-suggest rotated-box candidates for an image |
 | `POST /api/train` | Start a training run (`finetune` or `scratch`) |
 | `GET /api/train/jobs` | List training runs and their live progress |
 | `GET /api/models` | List available models (pretrained + trained + imported) |

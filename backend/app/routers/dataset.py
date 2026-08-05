@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 
-from app.schemas import CreateDatasetRequest, DatasetInfo, SaveAnnotationsRequest
-from app.services import dataset_service
+from app.schemas import CreateDatasetRequest, DatasetInfo, SaveAnnotationsRequest, Shape
+from app.services import autolabel_service, dataset_service
 from app.services.dataset_service import DatasetError
 
 router = APIRouter(prefix="/api/datasets", tags=["datasets"])
@@ -56,6 +57,18 @@ def delete_image(name: str, image_id: str):
     except DatasetError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True}
+
+
+@router.post("/{name}/images/{image_id}/suggest", response_model=list[Shape])
+async def suggest_shapes(name: str, image_id: str, class_name: str = Query(...)):
+    try:
+        path = dataset_service.image_path(name, image_id)
+    except DatasetError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Image file missing")
+    # CV pass over a full-size image can take a moment; keep it off the event loop.
+    return await run_in_threadpool(autolabel_service.suggest_cylinder_shapes, path, class_name)
 
 
 @router.post("/{name}/annotations")
