@@ -1,0 +1,19 @@
+# Backend
+backend/.venv/
+backend/data/
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
+
+# Ultralytics artifacts that may land at repo root if run from there
+runs/
+*.pt
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# OS / editor
+.DS_Store
+*.log

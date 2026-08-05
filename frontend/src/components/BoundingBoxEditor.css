@@ -1,0 +1,57 @@
+.bbox-editor {
+  display: inline-block;
+}
+
+.bbox-canvas {
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #333;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.bbox-rect {
+  position: absolute;
+  border: 2px solid #e6483d;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bbox-draft {
+  border-style: dashed;
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bbox-label {
+  position: absolute;
+  top: -20px;
+  left: -2px;
+  font-size: 11px;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.bbox-remove {
+  position: absolute;
+  top: -20px;
+  right: -2px;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.bbox-hint {
+  font-size: 13px;
+  color: #888;
+  margin-top: 6px;
+}
