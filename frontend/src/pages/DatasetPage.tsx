@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, imageUrl } from "../api/client";
-import type { BoundingBox, DatasetDetail, DatasetInfo } from "../api/types";
+import type { DatasetDetail, DatasetInfo, Shape } from "../api/types";
 import BoundingBoxEditor from "../components/BoundingBoxEditor";
 
 export default function DatasetPage() {
@@ -82,17 +82,17 @@ export default function DatasetPage() {
     setNewClassName("");
   }
 
-  async function handleBoxesChange(boxes: BoundingBox[]) {
+  async function handleShapesChange(shapes: Shape[]) {
     if (!detail || !activeImageId || !selected) return;
     const image = detail.images[activeImageId];
     const updatedDetail: DatasetDetail = {
       ...detail,
-      images: { ...detail.images, [activeImageId]: { ...image, boxes } },
+      images: { ...detail.images, [activeImageId]: { ...image, shapes } },
     };
     setDetail(updatedDetail);
     setSaving(true);
     try {
-      await api.saveAnnotations(selected, activeImageId, image.width, image.height, boxes);
+      await api.saveAnnotations(selected, activeImageId, image.width, image.height, shapes);
       await refreshDatasets();
     } catch (e) {
       setError(String(e));
@@ -115,7 +115,7 @@ export default function DatasetPage() {
     <div className="page">
       <h2>1. Dataset &amp; Labeling</h2>
       <p className="page-desc">
-        Create a dataset, upload images, then draw bounding boxes around objects to label them for training.
+        Create a dataset, upload images, then label objects with the box, ellipse, or pen (freehand) tool.
       </p>
 
       <section className="card">
@@ -189,7 +189,7 @@ export default function DatasetPage() {
                   <div key={id} className={"thumb" + (id === activeImageId ? " thumb-active" : "")}>
                     <img src={imageUrl(selected, id)} onClick={() => setActiveImageId(id)} alt="" />
                     <div className="thumb-meta">
-                      <span>{detail.images[id].boxes.length} box(es)</span>
+                      <span>{detail.images[id].shapes.length} shape(s)</span>
                       <button onClick={() => handleDeleteImage(id)}>delete</button>
                     </div>
                   </div>
@@ -207,8 +207,8 @@ export default function DatasetPage() {
                 naturalHeight={activeImage.height}
                 classes={detail.classes}
                 activeClass={activeClass}
-                boxes={activeImage.boxes}
-                onBoxesChange={handleBoxesChange}
+                shapes={activeImage.shapes}
+                onShapesChange={handleShapesChange}
               />
             </section>
           )}

@@ -3,6 +3,8 @@ import type {
   DatasetInfo,
   DetectionResult,
   ModelInfo,
+  ModelTask,
+  Shape,
   TrainJobStatus,
   TrainMode,
   UploadedImage,
@@ -57,13 +59,7 @@ export const api = {
       { method: "DELETE" }
     ),
 
-  saveAnnotations: (
-    name: string,
-    imageId: string,
-    imageWidth: number,
-    imageHeight: number,
-    boxes: DatasetDetail["images"][string]["boxes"]
-  ) =>
+  saveAnnotations: (name: string, imageId: string, imageWidth: number, imageHeight: number, shapes: Shape[]) =>
     request<{ ok: boolean }>(`/api/datasets/${encodeURIComponent(name)}/annotations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,7 +68,7 @@ export const api = {
         image_id: imageId,
         image_width: imageWidth,
         image_height: imageHeight,
-        boxes,
+        shapes,
       }),
     }),
 
@@ -97,6 +93,14 @@ export const api = {
     request<TrainJobStatus>(`/api/train/jobs/${encodeURIComponent(runName)}`),
 
   listModels: () => request<ModelInfo[]>("/api/models"),
+
+  importModel: async (file: File, label: string, task: ModelTask) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("label", label);
+    form.append("task", task);
+    return request<ModelInfo>("/api/models/import", { method: "POST", body: form });
+  },
 
   detect: async (file: File, modelId: string, confidence: number) => {
     const form = new FormData();

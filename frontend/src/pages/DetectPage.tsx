@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { DetectionResult, ModelInfo } from "../api/types";
+import type { DetectionResult, ModelInfo, ModelTask } from "../api/types";
 import BoundingBoxOverlay from "../components/BoundingBoxOverlay";
+
+const SOURCE_LABELS: Record<ModelInfo["source"], string> = {
+  pretrained: "Pretrained",
+  trained: "Trained by you",
+  imported: "Imported",
+};
 
 export default function DetectPage() {
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -13,14 +19,23 @@ export default function DetectPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLabel, setImportLabel] = useState("");
+  const [importTask, setImportTask] = useState<ModelTask>("detect");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+
+  function refreshModels(selectId?: string) {
+    return api.listModels().then((list) => {
+      setModels(list);
+      if (selectId) setModelId(selectId);
+      else if (!modelId && list.length > 0) setModelId(list[0].id);
+    });
+  }
+
   useEffect(() => {
-    api
-      .listModels()
-      .then((list) => {
-        setModels(list);
-        if (list.length > 0) setModelId(list[0].id);
-      })
-      .catch((e) => setError(String(e)));
+    refreshModels().catch((e) => setError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleFileChange(f: File | null) {
@@ -45,23 +60,81 @@ export default function DetectPage() {
     }
   }
 
+  async function handleImport() {
+    if (!importFile) return;
+    setImporting(true);
+    setImportError("");
+    try {
+      const imported = await api.importModel(importFile, importLabel.trim(), importTask);
+      setImportFile(null);
+      setImportLabel("");
+      await refreshModels(imported.id);
+    } catch (e) {
+      setImportError(String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const grouped: Record<string, ModelInfo[]> = {};
+  for (const m of models) {
+    (grouped[m.source] ??= []).push(m);
+  }
+
   return (
     <div className="page">
       <h2>3. Detect Objects</h2>
       <p className="page-desc">
-        Pick a model (pretrained or one you trained), upload an image, and run detection to see each object's
-        class, confidence, and position.
+        Pick a model, upload an image, and run detection to see each object's class, confidence, and position.
       </p>
+
+      <section className="card">
+        <h3>Import a model</h3>
+        <p className="page-desc">
+          Bring your own pretrained checkpoint (a YOLO variant, SAM, or anything Ultralytics can load) by uploading
+          its <code>.pt</code> weights file. Class names are read automatically from the checkpoint when available.
+        </p>
+        <div className="form-grid">
+          <label>
+            Weights file (.pt)
+            <input type="file" accept=".pt" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
+          </label>
+          <label>
+            Display name
+            <input
+              placeholder="e.g. my-yolov9-checkpoint"
+              value={importLabel}
+              onChange={(e) => setImportLabel(e.target.value)}
+            />
+          </label>
+          <label>
+            Task
+            <select value={importTask} onChange={(e) => setImportTask(e.target.value as ModelTask)}>
+              <option value="detect">Object detection (boxes)</option>
+              <option value="segment">Instance segmentation (masks)</option>
+              <option value="sam">SAM-style (class-agnostic, segments everything)</option>
+            </select>
+          </label>
+        </div>
+        <button onClick={handleImport} disabled={!importFile || importing}>
+          {importing ? "Importing…" : "Import model"}
+        </button>
+        {importError && <p className="error">{importError}</p>}
+      </section>
 
       <section className="card">
         <div className="form-grid">
           <label>
             Model
             <select value={modelId} onChange={(e) => setModelId(e.target.value)}>
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
+              {Object.entries(grouped).map(([source, list]) => (
+                <optgroup key={source} label={SOURCE_LABELS[source as ModelInfo["source"]] ?? source}>
+                  {list.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </label>
@@ -103,6 +176,7 @@ export default function DetectPage() {
               <thead>
                 <tr>
                   <th>Class</th>
+                  <th>Shape</th>
                   <th>Confidence</th>
                   <th>X</th>
                   <th>Y</th>
@@ -114,6 +188,7 @@ export default function DetectPage() {
                 {result.boxes.map((b, i) => (
                   <tr key={i}>
                     <td>{b.class_name}</td>
+                    <td>{b.points.length >= 3 ? "mask" : "box"}</td>
                     <td>{b.confidence != null ? `${(b.confidence * 100).toFixed(1)}%` : "-"}</td>
                     <td>{b.x.toFixed(0)}</td>
                     <td>{b.y.toFixed(0)}</td>
@@ -123,7 +198,7 @@ export default function DetectPage() {
                 ))}
                 {result.boxes.length === 0 && (
                   <tr>
-                    <td colSpan={6}>No objects detected above the confidence threshold.</td>
+                    <td colSpan={7}>No objects detected above the confidence threshold.</td>
                   </tr>
                 )}
               </tbody>

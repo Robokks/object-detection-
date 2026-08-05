@@ -7,7 +7,7 @@ from pathlib import Path
 from PIL import Image
 
 from app.config import DATASETS_DIR
-from app.schemas import BoundingBox, CreateDatasetRequest, DatasetInfo
+from app.schemas import CreateDatasetRequest, DatasetInfo, Shape
 
 
 class DatasetError(ValueError):
@@ -31,6 +31,22 @@ def _load_meta(name: str) -> dict:
 
 def _save_meta(name: str, meta: dict) -> None:
     _meta_path(name).write_text(json.dumps(meta, indent=2))
+
+
+def _polygon_points(shape: Shape) -> list[list[float]]:
+    """Absolute pixel polygon outline for a shape, for YOLO-seg label export."""
+    if shape.shape != "box" and len(shape.points) >= 3:
+        return shape.points
+    x, y, w, h = shape.x, shape.y, shape.width, shape.height
+    return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
+
+
+def _bbox_from_points(points: list[list[float]]) -> tuple[float, float, float, float]:
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    return x_min, y_min, x_max - x_min, y_max - y_min
 
 
 def create_dataset(req: CreateDatasetRequest) -> DatasetInfo:
@@ -61,7 +77,7 @@ def list_datasets() -> list[DatasetInfo]:
             continue
         meta = json.loads(meta_path.read_text())
         images = meta.get("images", {})
-        annotated = sum(1 for img in images.values() if img.get("boxes"))
+        annotated = sum(1 for img in images.values() if img.get("shapes"))
         results.append(
             DatasetInfo(
                 name=ds_dir.name,
@@ -95,7 +111,7 @@ def add_image(name: str, filename: str, content: bytes) -> dict:
         "filename": f"{image_id}{ext}",
         "width": width,
         "height": height,
-        "boxes": [],
+        "shapes": [],
     }
     _save_meta(name, meta)
     return {"image_id": image_id, "width": width, "height": height, "filename": f"{image_id}{ext}"}
@@ -110,32 +126,46 @@ def image_path(name: str, image_id: str) -> Path:
 
 
 def save_annotations(
-    name: str, image_id: str, image_width: int, image_height: int, boxes: list[BoundingBox]
+    name: str, image_id: str, image_width: int, image_height: int, shapes: list[Shape]
 ) -> None:
     meta = _load_meta(name)
     if image_id not in meta["images"]:
         raise DatasetError(f"Image '{image_id}' not found in dataset '{name}'")
 
     classes: list[str] = meta["classes"]
-    for box in boxes:
-        if box.class_name not in classes:
-            classes.append(box.class_name)
+    for shape in shapes:
+        if shape.class_name not in classes:
+            classes.append(shape.class_name)
     meta["classes"] = classes
 
-    meta["images"][image_id]["boxes"] = [box.model_dump() for box in boxes]
+    stored_shapes = []
+    label_lines = []
+    for shape in shapes:
+        polygon = _polygon_points(shape)
+        x, y, w, h = _bbox_from_points(polygon) if shape.shape != "box" else (
+            shape.x,
+            shape.y,
+            shape.width,
+            shape.height,
+        )
+        stored = shape.model_copy(update={"x": x, "y": y, "width": w, "height": h})
+        stored_shapes.append(stored.model_dump())
+
+        class_idx = classes.index(shape.class_name)
+        normalized = []
+        for px, py in polygon:
+            nx = min(max(px / image_width, 0.0), 1.0)
+            ny = min(max(py / image_height, 0.0), 1.0)
+            normalized.extend([nx, ny])
+        coords = " ".join(f"{v:.6f}" for v in normalized)
+        label_lines.append(f"{class_idx} {coords}")
+
+    meta["images"][image_id]["shapes"] = stored_shapes
     _save_meta(name, meta)
 
     ds_dir = _dataset_dir(name)
     label_path = ds_dir / "labels" / f"{image_id}.txt"
-    lines = []
-    for box in boxes:
-        class_idx = classes.index(box.class_name)
-        cx = (box.x + box.width / 2) / image_width
-        cy = (box.y + box.height / 2) / image_height
-        w = box.width / image_width
-        h = box.height / image_height
-        lines.append(f"{class_idx} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}")
-    label_path.write_text("\n".join(lines))
+    label_path.write_text("\n".join(label_lines))
 
 
 def delete_image(name: str, image_id: str) -> None:
@@ -151,11 +181,11 @@ def delete_image(name: str, image_id: str) -> None:
 
 
 def export_yolo_dataset(name: str, val_split: float = 0.2, seed: int = 42) -> Path:
-    """Builds a YOLO-format dataset (train/val split + data.yaml) under datasets/<name>/export."""
+    """Builds a YOLO-seg dataset (train/val split + data.yaml) under datasets/<name>/export."""
     meta = _load_meta(name)
     classes: list[str] = meta["classes"]
     annotated_ids = [
-        image_id for image_id, entry in meta["images"].items() if entry.get("boxes")
+        image_id for image_id, entry in meta["images"].items() if entry.get("shapes")
     ]
     if not annotated_ids:
         raise DatasetError(f"Dataset '{name}' has no annotated images to train on")

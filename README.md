@@ -1,36 +1,65 @@
 # Vision Object Detection Studio
 
-A web app for training a custom object-detection model and then using it to
-detect objects (class + position) in new images.
+A web app for training a custom object-detection/segmentation model and then
+using it to detect objects (class + position) in new images.
 
-- **Backend** (`backend/`): FastAPI + [Ultralytics YOLOv8](https://docs.ultralytics.com/).
-  Handles dataset storage, labeling, training, and inference.
+- **Backend** (`backend/`): FastAPI + [Ultralytics](https://docs.ultralytics.com/)
+  (YOLOv8 detect/segment + SAM). Handles dataset storage, labeling, training,
+  model management, and inference.
 - **Frontend** (`frontend/`): React + Vite (TypeScript). Three screens:
-  1. **Dataset** — create a dataset, upload images, draw bounding boxes to
-     label objects.
+  1. **Dataset** — create a dataset, upload images, and label objects with a
+     **box**, **ellipse**, or **pen** (freehand) tool.
   2. **Train** — fine-tune a pretrained YOLOv8 checkpoint on your labeled
      dataset, or train a fresh model from scratch. Training runs in the
      background with live progress.
-  3. **Detect** — pick a model (pretrained COCO weights or one you trained),
-     upload an image, and see detected objects drawn as bounding boxes plus
-     a table with class, confidence, and pixel position for each detection.
+  3. **Detect** — pick a model, upload an image, and see detected objects
+     drawn as boxes/masks plus a table with class, confidence, and pixel
+     position for each detection. You can also **import your own pretrained
+     `.pt` checkpoint** (another YOLO variant, SAM, etc.) here.
 
 ## How it works
 
-Datasets are stored on disk as images + per-image bounding boxes (drawn in
-the browser). At training time, annotations are converted to YOLO-format
-labels and split into train/val sets automatically. Training uses
-Ultralytics' `YOLO` class:
+### Labeling
 
-- **Fine-tune mode** starts from pretrained COCO weights (`yolov8n.pt` /
-  `yolov8s.pt`) — recommended for small datasets, converges quickly.
+Datasets are stored on disk as images + per-image shapes drawn in the
+browser (box, ellipse, or freehand polygon). Every shape's outline —
+including plain boxes, treated as 4-point outlines — is exported as a
+YOLO-seg polygon label at training time, split into train/val sets
+automatically.
+
+### Training
+
+Training always targets the instance-segmentation variant of the chosen
+architecture (e.g. `yolov8n-seg`), since labels are polygon outlines:
+
+- **Fine-tune mode** starts from pretrained COCO weights — recommended for
+  small datasets, converges quickly.
 - **Scratch mode** starts from the model architecture only (random weights)
   — useful if you don't want any COCO-derived weights, but needs a larger
   dataset and more epochs to converge.
 
-Trained weights are saved under `backend/data/weights/<run_name>.pt` and
-immediately become selectable on the Detect page alongside the stock
-pretrained models.
+Trained weights are saved under `backend/data/weights/trained/<run_name>.pt`
+and immediately become selectable on the Detect page.
+
+### Models
+
+The Detect page's model list combines three sources:
+
+- **Pretrained** — a small built-in catalog: YOLOv8n/s/m (detection),
+  YOLOv8n/s-seg (segmentation), and SAM base (`sam_b.pt`, class-agnostic —
+  it segments every object it finds but doesn't name them). Ultralytics
+  downloads these automatically on first use (needs network access).
+- **Trained by you** — runs completed on the Train page.
+- **Imported** — any `.pt` checkpoint you upload on the Detect page. It's
+  validated by loading it with Ultralytics; class names are read from the
+  checkpoint automatically when present. Choose the task that matches the
+  checkpoint (detection, segmentation, or SAM-style).
+
+Detection results carry a polygon outline (`points`) whenever the model
+produces a mask (segmentation/SAM); plain detection models return just a
+bounding box. The bounding box (`x`, `y`, `width`, `height`) is always
+populated either way, so "position" is always available regardless of
+model type.
 
 ## Requirements
 
@@ -49,12 +78,12 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-The first time you train or run detection, Ultralytics will download the
-pretrained checkpoint (e.g. `yolov8n.pt`) automatically — this requires
-network access.
+The first time you train or run detection with a pretrained model,
+Ultralytics will download its checkpoint automatically — this requires
+network access. SAM's checkpoint in particular is a large download.
 
-All data (datasets, uploaded images, training runs, trained weights) is
-stored under `backend/data/`, which is gitignored.
+All data (datasets, uploaded images, training runs, trained/imported
+weights) is stored under `backend/data/`, which is gitignored.
 
 ## Frontend setup
 
@@ -75,15 +104,19 @@ both the backend and frontend at the same time.
 | `POST /api/datasets` | Create a dataset with a set of class names |
 | `GET /api/datasets` | List datasets with image/annotation counts |
 | `POST /api/datasets/{name}/images` | Upload an image to a dataset |
-| `POST /api/datasets/{name}/annotations` | Save bounding boxes for an image |
+| `POST /api/datasets/{name}/annotations` | Save labeled shapes for an image |
 | `POST /api/train` | Start a training run (`finetune` or `scratch`) |
 | `GET /api/train/jobs` | List training runs and their live progress |
-| `GET /api/models` | List available models (pretrained + trained) |
+| `GET /api/models` | List available models (pretrained + trained + imported) |
+| `POST /api/models/import` | Upload and register a custom `.pt` checkpoint |
 | `POST /api/detect` | Run detection on an uploaded image with a chosen model |
 
 ## Notes
 
 - This is a local, single-user tool — there is no auth and the backend is
-  meant to be run on your own machine or a trusted network.
-- Training runs synchronously per-request in a background thread; only run
-  one training job at a time.
+  meant to be run on your own machine or a trusted network. Anyone who can
+  reach the backend can upload arbitrary `.pt` files, which Python can
+  deserialize with side effects — don't expose it to an untrusted network.
+- Training runs in a background thread; only run one training job at a time.
+- SAM's "everything" mode (no prompts) can return many masks for a busy
+  image; the API caps this at 50, keeping the largest ones.

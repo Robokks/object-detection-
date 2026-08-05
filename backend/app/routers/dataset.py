@@ -62,7 +62,7 @@ def delete_image(name: str, image_id: str):
 def save_annotations(name: str, req: SaveAnnotationsRequest):
     try:
         dataset_service.save_annotations(
-            name, req.image_id, req.image_width, req.image_height, req.boxes
+            name, req.image_id, req.image_width, req.image_height, req.shapes
         )
     except DatasetError as e:
         raise HTTPException(status_code=400, detail=str(e))

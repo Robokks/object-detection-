@@ -1,6 +1,10 @@
-export interface BoundingBox {
+export type ShapeKind = "box" | "ellipse" | "polygon";
+
+export interface Shape {
   class_name: string;
   confidence?: number | null;
+  shape: ShapeKind;
+  points: number[][];
   x: number;
   y: number;
   width: number;
@@ -18,7 +22,7 @@ export interface DatasetImageEntry {
   filename: string;
   width: number;
   height: number;
-  boxes: BoundingBox[];
+  shapes: Shape[];
 }
 
 export interface DatasetDetail {
@@ -47,15 +51,19 @@ export interface TrainJobStatus {
   weights_path?: string | null;
 }
 
+export type ModelTask = "detect" | "segment" | "sam";
+export type ModelSource = "pretrained" | "trained" | "imported";
+
 export interface ModelInfo {
   id: string;
   label: string;
-  source: "pretrained" | "trained";
+  source: ModelSource;
+  task: ModelTask;
   classes: string[];
 }
 
 export interface DetectionResult {
   image_width: number;
   image_height: number;
-  boxes: BoundingBox[];
+  boxes: Shape[];
 }

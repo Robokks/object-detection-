@@ -1,19 +1,18 @@
-import type { BoundingBox } from "../api/types";
+import type { Shape } from "../api/types";
+import { colorForClass } from "./BoundingBoxEditor";
 import "./BoundingBoxEditor.css";
 
 const DISPLAY_MAX_WIDTH = 760;
-const BOX_COLORS = ["#e6483d", "#3d8ce6", "#3de68c", "#e6c73d", "#a13de6", "#e63dae"];
 
-function colorForClass(className: string, classes: string[]): string {
-  const idx = classes.indexOf(className);
-  return BOX_COLORS[(idx < 0 ? 0 : idx) % BOX_COLORS.length];
+function toSvgPoints(points: number[][], scale: number): string {
+  return points.map(([px, py]) => `${px * scale},${py * scale}`).join(" ");
 }
 
 interface Props {
   imageSrc: string;
   naturalWidth: number;
   naturalHeight: number;
-  boxes: BoundingBox[];
+  boxes: Shape[];
 }
 
 export default function BoundingBoxOverlay({ imageSrc, naturalWidth, naturalHeight, boxes }: Props) {
@@ -27,21 +26,31 @@ export default function BoundingBoxOverlay({ imageSrc, naturalWidth, naturalHeig
       className="bbox-canvas"
       style={{ width: displayWidth, height: displayHeight, backgroundImage: `url(${imageSrc})`, cursor: "default" }}
     >
-      {boxes.map((box, idx) => (
-        <div
-          key={idx}
-          className="bbox-rect"
-          style={{
-            left: box.x * scale,
-            top: box.y * scale,
-            width: box.width * scale,
-            height: box.height * scale,
-            borderColor: colorForClass(box.class_name, classes),
-          }}
-        >
-          <span className="bbox-label" style={{ background: colorForClass(box.class_name, classes) }}>
-            {box.class_name}
-            {box.confidence != null ? ` ${(box.confidence * 100).toFixed(0)}%` : ""}
+      <svg className="bbox-svg" width={displayWidth} height={displayHeight}>
+        {boxes.map((shape, idx) => {
+          const color = colorForClass(shape.class_name, classes);
+          if (shape.points.length >= 3) {
+            return <polygon key={idx} points={toSvgPoints(shape.points, scale)} className="bbox-shape" stroke={color} />;
+          }
+          return (
+            <rect
+              key={idx}
+              x={shape.x * scale}
+              y={shape.y * scale}
+              width={shape.width * scale}
+              height={shape.height * scale}
+              className="bbox-shape"
+              stroke={color}
+            />
+          );
+        })}
+      </svg>
+
+      {boxes.map((shape, idx) => (
+        <div key={idx} className="bbox-controls" style={{ left: shape.x * scale, top: shape.y * scale - 20 }}>
+          <span className="bbox-label" style={{ background: colorForClass(shape.class_name, classes) }}>
+            {shape.class_name}
+            {shape.confidence != null ? ` ${(shape.confidence * 100).toFixed(0)}%` : ""}
           </span>
         </div>
       ))}

@@ -2,7 +2,7 @@ import json
 import threading
 import traceback
 
-from app.config import RUNS_DIR, WEIGHTS_DIR, DEFAULT_PRETRAINED_WEIGHTS
+from app.config import RUNS_DIR, TRAINED_WEIGHTS_DIR
 from app.schemas import TrainJobStatus, TrainRequest
 from app.services import dataset_service
 from app.services.dataset_service import DatasetError
@@ -61,12 +61,13 @@ def _run_training(req: TrainRequest) -> None:
         meta = dataset_service.get_dataset(req.dataset_name)
         classes = meta["classes"]
 
+        base_model = req.base_model or "yolov8n"
+        # Labels are always exported as polygons (boxes are 4-point polygons),
+        # so training always targets the instance-segmentation task/architecture.
         if req.mode == "finetune":
-            checkpoint = f"{req.base_model}.pt" if req.base_model else DEFAULT_PRETRAINED_WEIGHTS
-            model = YOLO(checkpoint)
+            model = YOLO(f"{base_model}-seg.pt")
         else:
-            config = f"{req.base_model}.yaml" if req.base_model else "yolov8n.yaml"
-            model = YOLO(config)
+            model = YOLO(f"{base_model}-seg.yaml")
 
         def on_epoch_end(trainer):
             epoch = trainer.epoch + 1
@@ -103,9 +104,17 @@ def _run_training(req: TrainRequest) -> None:
         if not best_weights.exists():
             raise TrainError("Training finished but no weights were produced")
 
-        final_weights = WEIGHTS_DIR / f"{req.run_name}.pt"
+        final_weights = TRAINED_WEIGHTS_DIR / f"{req.run_name}.pt"
         final_weights.write_bytes(best_weights.read_bytes())
-        (WEIGHTS_DIR / f"{req.run_name}.classes.json").write_text(json.dumps(classes))
+        (TRAINED_WEIGHTS_DIR / f"{req.run_name}.meta.json").write_text(
+            json.dumps(
+                {
+                    "label": f"{req.run_name} (custom trained, {req.mode})",
+                    "task": "segment",
+                    "classes": classes,
+                }
+            )
+        )
 
         _set_job(
             req.run_name,

@@ -60,7 +60,10 @@ export default function TrainPage() {
       <h2>2. Train a Model</h2>
       <p className="page-desc">
         Fine-tune a pretrained YOLO checkpoint on your labeled dataset (fast, works with small datasets), or
-        train a fresh model from scratch using the same architecture with random weights.
+        train a fresh model from scratch using the same architecture with random weights. Since labels can include
+        ellipses and freehand outlines, training always targets the instance-segmentation variant of the chosen
+        architecture (e.g. yolov8n-seg) so that precision isn't lost — plain boxes still work fine, they're just
+        treated as 4-point outlines.
       </p>
 
       <section className="card">

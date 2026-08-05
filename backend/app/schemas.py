@@ -2,21 +2,28 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+ShapeKind = Literal["box", "ellipse", "polygon"]
+ModelTask = Literal["detect", "segment", "sam"]
+ModelSource = Literal["pretrained", "trained", "imported"]
 
-class BoundingBox(BaseModel):
-    """Bounding box in absolute pixel coordinates, top-left origin."""
+
+class Shape(BaseModel):
+    """A labeled region, in absolute pixel coordinates (top-left origin).
+
+    `x`/`y`/`width`/`height` are always the axis-aligned bounding box of the
+    shape. `points` additionally carries the outline for non-box shapes
+    (ellipse: a sampled ring; polygon: the freehand path) so the exact
+    region can be re-drawn and exported as a YOLO-seg polygon label.
+    """
 
     class_name: str
     confidence: Optional[float] = None
-    x: float = Field(..., description="Top-left x in pixels")
-    y: float = Field(..., description="Top-left y in pixels")
-    width: float = Field(..., description="Box width in pixels")
-    height: float = Field(..., description="Box height in pixels")
-
-
-class ImageAnnotations(BaseModel):
-    image_id: str
-    boxes: list[BoundingBox]
+    shape: ShapeKind = "box"
+    points: list[list[float]] = Field(default_factory=list)
+    x: float = Field(..., description="Bounding box top-left x in pixels")
+    y: float = Field(..., description="Bounding box top-left y in pixels")
+    width: float = Field(..., description="Bounding box width in pixels")
+    height: float = Field(..., description="Bounding box height in pixels")
 
 
 class SaveAnnotationsRequest(BaseModel):
@@ -24,7 +31,7 @@ class SaveAnnotationsRequest(BaseModel):
     image_id: str
     image_width: int
     image_height: int
-    boxes: list[BoundingBox]
+    shapes: list[Shape]
 
 
 class DatasetInfo(BaseModel):
@@ -64,16 +71,16 @@ class TrainJobStatus(BaseModel):
 class ModelInfo(BaseModel):
     id: str
     label: str
-    source: Literal["pretrained", "trained"]
+    source: ModelSource
+    task: ModelTask
     classes: list[str] = []
 
 
-class DetectRequest(BaseModel):
-    model_id: str
-    confidence: float = 0.25
+class ImportModelResponse(BaseModel):
+    model: ModelInfo
 
 
 class DetectionResult(BaseModel):
     image_width: int
     image_height: int
-    boxes: list[BoundingBox]
+    boxes: list[Shape]
