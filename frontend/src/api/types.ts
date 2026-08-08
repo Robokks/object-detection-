@@ -40,6 +40,13 @@ export interface UploadedImage {
   filename: string;
 }
 
+export interface ImportAnnotatedImageResult {
+  filename: string;
+  image_id?: string | null;
+  shapes_found: number;
+  error?: string | null;
+}
+
 export type TrainMode = "finetune" | "scratch";
 
 export interface TrainJobStatus {

@@ -16,6 +16,8 @@ export default function DatasetPage() {
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestMessage, setSuggestMessage] = useState("");
+  const [importingAnnotated, setImportingAnnotated] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   async function refreshDatasets(selectName?: string) {
     const list = await api.listDatasets();
@@ -100,6 +102,28 @@ export default function DatasetPage() {
       setError(String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleImportAnnotated(files: FileList | null) {
+    if (!files || files.length === 0 || !selected || !activeClass) return;
+    setImportingAnnotated(true);
+    setImportMessage("");
+    setError("");
+    try {
+      const results = await api.importAnnotatedImages(selected, Array.from(files), activeClass);
+      const totalShapes = results.reduce((sum, r) => sum + r.shapes_found, 0);
+      const failed = results.filter((r) => r.error);
+      await loadDetail(selected);
+      await refreshDatasets();
+      setImportMessage(
+        `Imported ${results.length - failed.length}/${results.length} image(s), extracted ${totalShapes} shape(s) labeled "${activeClass}".` +
+          (failed.length > 0 ? ` ${failed.length} failed: ${failed.map((f) => f.filename).join(", ")}` : "")
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setImportingAnnotated(false);
     }
   }
 
@@ -202,6 +226,25 @@ export default function DatasetPage() {
                 Add class
               </button>
             </div>
+          </section>
+
+          <section className="card">
+            <h3>Import pre-annotated images</h3>
+            <p className="page-desc">
+              Already marked objects by hand-drawing solid red outlines directly on your images? Upload them here
+              instead of plain photos. Each red outline is extracted as a shape labeled{" "}
+              <strong>{activeClass || "(select a class above)"}</strong>, and the red lines are removed from the
+              stored image so they don't end up as a training artifact.
+            </p>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={!activeClass || importingAnnotated}
+              onChange={(e) => handleImportAnnotated(e.target.files)}
+            />
+            {importingAnnotated && <p className="suggest-message">Extracting outlines…</p>}
+            {importMessage && <p className="suggest-message">{importMessage}</p>}
           </section>
 
           {imageIds.length > 0 && (

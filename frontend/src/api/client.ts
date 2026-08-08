@@ -2,6 +2,7 @@ import type {
   DatasetDetail,
   DatasetInfo,
   DetectionResult,
+  ImportAnnotatedImageResult,
   ModelInfo,
   ModelTask,
   Shape,
@@ -71,6 +72,15 @@ export const api = {
         shapes,
       }),
     }),
+
+  importAnnotatedImages: async (name: string, files: File[], className: string) => {
+    const form = new FormData();
+    for (const file of files) form.append("files", file);
+    return request<ImportAnnotatedImageResult[]>(
+      `/api/datasets/${encodeURIComponent(name)}/import-annotated?class_name=${encodeURIComponent(className)}`,
+      { method: "POST", body: form }
+    );
+  },
 
   suggestShapes: (name: string, imageId: string, className: string) =>
     request<Shape[]>(

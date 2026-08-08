@@ -92,6 +92,13 @@ class ImportModelResponse(BaseModel):
     model: ModelInfo
 
 
+class ImportAnnotatedImageResult(BaseModel):
+    filename: str
+    image_id: Optional[str] = None
+    shapes_found: int = 0
+    error: Optional[str] = None
+
+
 class DetectionResult(BaseModel):
     image_width: int
     image_height: int

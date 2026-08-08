@@ -53,6 +53,24 @@ it tends to merge them into one coarse box. Delete anything wrong the same
 way you'd delete a hand-drawn shape; accepted candidates are saved exactly
 like any other annotation.
 
+### Importing already hand-marked images
+
+If you've already marked objects by drawing solid outlines directly on your
+images (common when labeling without a dedicated tool), use **"Import
+pre-annotated images"** on the Dataset page instead of the plain image
+upload. It looks for outlines drawn in solid red (`RGB 237,28,36` and
+similar), extracts one shape per outline, and removes the red pixels from
+the stored image (via inpainting) so the red lines themselves don't become
+a training artifact the model could latch onto instead of the real object.
+
+Touching or overlapping outlines are still separated correctly: rather than
+treating each red blob as one shape (which merges outlines that touch),
+this looks at each outline's *interior* — two outlines that touch at an
+edge still have separate interiors, so they come out as separate shapes.
+Hand-drawn/wobbly outlines are fit with an oriented rectangle same as the
+rotated-box tool. If your outlines are a different, non-red color, this
+won't find them yet — say so and it can be adjusted.
+
 ### Training
 
 Training always targets the instance-segmentation variant of the chosen
@@ -134,6 +152,7 @@ both the backend and frontend at the same time.
 | `POST /api/datasets/{name}/images` | Upload an image to a dataset |
 | `POST /api/datasets/{name}/annotations` | Save labeled shapes for an image |
 | `POST /api/datasets/{name}/images/{image_id}/suggest` | Auto-suggest rotated-box candidates for an image |
+| `POST /api/datasets/{name}/import-annotated` | Import images with hand-drawn red outlines; extracts shapes and cleans the images |
 | `POST /api/train` | Start a training run (`finetune` or `scratch`) |
 | `GET /api/train/jobs` | List training runs and their live progress |
 | `GET /api/models` | List available models (pretrained + trained + imported) |
