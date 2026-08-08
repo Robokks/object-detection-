@@ -143,6 +143,35 @@ This starts the app at `http://localhost:5173`, configured (via
 `.env.development`) to talk to the backend at `http://localhost:8000`. Run
 both the backend and frontend at the same time.
 
+## Running in PyCharm (no terminal)
+
+The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)
+that appear automatically in the run-configuration dropdown (top toolbar)
+once you open the project folder in PyCharm — no command line needed:
+
+- **Backend (FastAPI)** — runs `backend/run.py`. First run, PyCharm needs an
+  interpreter for it: create the venv once (`Settings/Preferences → Project →
+  Python Interpreter → Add Interpreter → Virtualenv → New`, pointed at
+  `backend/.venv`) and install `backend/requirements.txt` through the same
+  Settings page's package-install UI — no terminal either way. If PyCharm
+  can't find the interpreter the config expects, it'll prompt you to pick
+  one; select that same `backend/.venv`.
+- **Frontend (Vite dev server)** — runs `npm run dev` in `frontend/`.
+  Requires PyCharm's bundled JavaScript/Node.js support (present in
+  PyCharm Professional; on Community, add it via `Settings → Plugins →
+  Marketplace → "Node.js"`, also just clicks, no terminal). Point it at a
+  Node interpreter the same way if prompted.
+- **Run Everything (Backend + Frontend)** — a compound configuration that
+  starts both with a single click.
+
+Pick a configuration from the dropdown and click the green ▶. Fallback if a
+configuration doesn't show up cleanly (PyCharm versions vary): open
+`backend/run.py` directly and click the ▶ that appears next to
+`if __name__ == "__main__":` — that always works with zero configuration,
+same idea as running any Python script from an IDE. The frontend has an
+equivalent: open `frontend/package.json`, and PyCharm shows a ▶ run icon
+next to the `"dev"` entry under `"scripts"`.
+
 ## API overview
 
 | Endpoint | Description |

@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run Everything (Backend + Frontend)" type="CompoundRunConfigurationType">
+    <toRun name="Backend (FastAPI)" type="PythonConfigurationType" />
+    <toRun name="Frontend (Vite dev server)" type="js.build_tools.npm" />
+    <method v="2" />
+  </configuration>
+</component>

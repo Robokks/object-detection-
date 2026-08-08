@@ -17,3 +17,8 @@ frontend/.env.local
 # OS / editor
 .DS_Store
 *.log
+
+# PyCharm — keep only the shared run configurations, not machine-specific state
+.idea/*
+!.idea/runConfigurations/
+!.idea/runConfigurations/**
