@@ -211,6 +211,31 @@ This doesn't touch the app's model registry or `backend/data/` — point it
 at any `.pt` checkpoint (e.g. `best.pt` from the Colab notebook) and any
 image, independent of whatever's imported into the desktop/web apps.
 
+There's also `backend/scripts/pin_detect_json.py` — the same idea, but a
+single fully self-contained file with no dependency on the rest of this
+repo (only `pip install ultralytics opencv-python numpy`), so it's the one
+to copy onto another machine on its own. Set `MODEL` near the top to your
+`.pt` checkpoint, then:
+
+```bash
+python pin_detect_json.py photo.jpg     # one image
+python pin_detect_json.py photos/       # every image in a folder
+```
+
+It writes the same JSON shape as `detect_to_json.py` (`detections.json` by
+default) and, as a bonus, also saves an annotated copy of each image
+(`<name>_detections.png`) with boxes/masks, class + confidence labels, and
+a center marker drawn on it, plus a console summary per image — handy for
+eyeballing results without opening a JSON file. Task (`detect`/`segment`)
+is read automatically from the checkpoint, so there's nothing to set beyond
+`MODEL`, `CONF`, `IOU`, and `IMGSZ`.
+
+Use `detect_to_json.py` when you're working inside this repo and want the
+output guaranteed identical to the desktop app's table (it shares the exact
+same code). Use `pin_detect_json.py` when you want one portable file with
+zero repo dependency — e.g. deploying detection to a machine that doesn't
+have this repo at all.
+
 ## Requirements
 
 - Python 3.10+
