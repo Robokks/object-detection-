@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (
 )
 
 from app.schemas import DetectionResult, ModelTask, Shape
-from app.services import model_service
+from app.services import dataset_service, model_service
+from app.services.dataset_service import DatasetError
 
 from .canvas import InteractiveCanvas
 from .workers import FunctionWorker
@@ -126,6 +127,7 @@ class DetectPage(QWidget):
         self.canvas = InteractiveCanvas(read_only=True)
         self.canvas.setMinimumHeight(360)
         self.canvas.roiChanged.connect(self._on_roi_changed)
+        self.canvas.shapesChanged.connect(self._on_canvas_shapes_edited)
         results_layout.addWidget(self.canvas)
 
         self.results_table = QTableWidget(0, len(RESULT_COLUMNS))
@@ -140,7 +142,59 @@ class DetectPage(QWidget):
         results_layout.addWidget(self.results_table)
         root.addWidget(results_box, stretch=1)
 
+        # --- fix wrong detections, save as training data ---
+        fix_box = QGroupBox("Fix wrong detections & save for fine-tuning")
+        fix_layout = QVBoxLayout(fix_box)
+        fix_hint = QLabel(
+            "Select a wrong detection above (click it on the image or in the table), then Enable corrections "
+            "to delete it or redraw it correctly. When you're happy with this image, save it into a dataset — "
+            "then fine-tune from the Train tab once you've corrected a few."
+        )
+        fix_hint.setWordWrap(True)
+        fix_layout.addWidget(fix_hint)
+
+        correction_row = QHBoxLayout()
+        self.correction_btn = QPushButton("Enable corrections")
+        self.correction_btn.setCheckable(True)
+        self.correction_btn.toggled.connect(self._on_correction_mode_toggled)
+        self.correction_tool_buttons: dict[str, QPushButton] = {}
+        for tool_id, label in (("box", "Box"), ("rotated_box", "Rotated Box"), ("ellipse", "Ellipse"), ("polygon", "Pen")):
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.setEnabled(False)
+            btn.clicked.connect(lambda _checked, t=tool_id: self._on_correction_tool_selected(t))
+            correction_row.addWidget(btn)
+            self.correction_tool_buttons[tool_id] = btn
+        self.correction_tool_buttons["box"].setChecked(True)
+        self.delete_shape_btn = QPushButton("Delete selected shape")
+        self.delete_shape_btn.setEnabled(False)
+        self.delete_shape_btn.clicked.connect(lambda: self.canvas.delete_selected())
+        correction_row.addWidget(self.delete_shape_btn)
+        correction_row.addWidget(self.correction_btn)
+        fix_layout.addLayout(correction_row)
+
+        save_row = QHBoxLayout()
+        save_row.addWidget(QLabel("Class"))
+        self.correction_class_combo = QComboBox()
+        self.correction_class_combo.setEditable(True)
+        self.correction_class_combo.currentTextChanged.connect(self.canvas.set_active_class)
+        save_row.addWidget(self.correction_class_combo)
+        save_row.addWidget(QLabel("Save to dataset"))
+        self.correction_dataset_combo = QComboBox()
+        self.correction_dataset_combo.currentTextChanged.connect(self._on_correction_dataset_changed)
+        save_row.addWidget(self.correction_dataset_combo, stretch=1)
+        self.save_correction_btn = QPushButton("Save corrected image to dataset")
+        self.save_correction_btn.clicked.connect(self._on_save_correction)
+        save_row.addWidget(self.save_correction_btn)
+        fix_layout.addLayout(save_row)
+
+        self.correction_status = QLabel("")
+        self.correction_status.setWordWrap(True)
+        fix_layout.addWidget(self.correction_status)
+        root.addWidget(fix_box)
+
         self.refresh_models()
+        self.refresh_correction_datasets()
 
     def refresh_models(self, select_id: str = "") -> None:
         current = select_id or self.model_combo.currentData()
@@ -187,6 +241,8 @@ class DetectPage(QWidget):
             self._last_boxes = []
             self.roi_btn.setChecked(False)
             self.roi_status_label.setText("ROI: full image")
+            self.correction_btn.setChecked(False)  # also resets canvas.read_only via the toggled handler
+            self.correction_status.setText("")
 
     def _on_run_detection(self) -> None:
         model_id = self.model_combo.currentData()
@@ -247,6 +303,7 @@ class DetectPage(QWidget):
     def _on_roi_mode_toggled(self, checked: bool) -> None:
         self.canvas.set_roi_mode(checked)
         self.roi_btn.setText("Drawing ROI… drag on image" if checked else "Set ROI")
+        self.correction_btn.setEnabled(not checked)
 
     def _on_clear_roi(self) -> None:
         self.canvas.clear_roi()
@@ -285,6 +342,99 @@ class DetectPage(QWidget):
             return rx <= cx <= rx + rw and ry <= cy <= ry + rh
 
         return [b for b in boxes if inside(b)]
+
+    # ---- fix wrong detections, save for fine-tuning --------------------
+
+    def _on_canvas_shapes_edited(self, shapes: list[Shape]) -> None:
+        # fires when a correction (delete/redraw) changes the canvas's shapes;
+        # that edited set becomes the new source of truth for this image.
+        self._last_boxes = list(shapes)
+        self._populate_results_table(shapes)
+        self.roi_status_label.setText("ROI: full image")
+
+    def _on_correction_mode_toggled(self, checked: bool) -> None:
+        self.canvas.set_read_only(not checked)
+        self.roi_btn.setEnabled(not checked)
+        self.clear_roi_btn.setEnabled(not checked)
+        for btn in self.correction_tool_buttons.values():
+            btn.setEnabled(checked)
+        self.delete_shape_btn.setEnabled(checked)
+        self.correction_btn.setText("Finish corrections" if checked else "Enable corrections")
+        if checked:
+            self.canvas.clear_roi()
+            self.roi_btn.setChecked(False)
+            active_tool = next((t for t, b in self.correction_tool_buttons.items() if b.isChecked()), "box")
+            self.canvas.set_tool(active_tool)
+            self.canvas.set_active_class(self.correction_class_combo.currentText())
+
+    def _on_correction_tool_selected(self, tool_id: str) -> None:
+        for t, btn in self.correction_tool_buttons.items():
+            btn.setChecked(t == tool_id)
+        self.canvas.set_tool(tool_id)
+
+    def refresh_correction_datasets(self, select_name: str = "") -> None:
+        current = select_name or self.correction_dataset_combo.currentData()
+        self.correction_dataset_combo.blockSignals(True)
+        self.correction_dataset_combo.clear()
+        self.correction_dataset_combo.addItem("-- choose dataset --", "")
+        for d in dataset_service.list_datasets():
+            self.correction_dataset_combo.addItem(d.name, d.name)
+        self.correction_dataset_combo.blockSignals(False)
+        if current:
+            idx = self.correction_dataset_combo.findData(current)
+            if idx >= 0:
+                self.correction_dataset_combo.setCurrentIndex(idx)
+        self._refresh_correction_class_options()
+
+    def _on_correction_dataset_changed(self, _text: str) -> None:
+        self._refresh_correction_class_options()
+
+    def _refresh_correction_class_options(self) -> None:
+        dataset_name = self.correction_dataset_combo.currentData()
+        classes: list[str] = []
+        if dataset_name:
+            try:
+                meta = dataset_service.get_dataset(dataset_name)
+                classes = list(meta.get("classes", []))
+            except DatasetError:
+                classes = []
+        for b in self._last_boxes:
+            if b.class_name not in classes:
+                classes.append(b.class_name)
+
+        current = self.correction_class_combo.currentText()
+        self.correction_class_combo.blockSignals(True)
+        self.correction_class_combo.clear()
+        self.correction_class_combo.addItems(classes)
+        if current and current in classes:
+            self.correction_class_combo.setCurrentText(current)
+        elif classes:
+            self.correction_class_combo.setCurrentIndex(0)
+        self.correction_class_combo.blockSignals(False)
+        self.canvas.set_active_class(self.correction_class_combo.currentText())
+
+    def _on_save_correction(self) -> None:
+        dataset_name = self.correction_dataset_combo.currentData()
+        if not dataset_name:
+            QMessageBox.information(self, "Choose a dataset", "Pick a destination dataset first.")
+            return
+        if not self._image_path:
+            QMessageBox.information(self, "Choose an image", "Run detection on an image first.")
+            return
+
+        shapes = [s.model_copy(update={"confidence": None}) for s in self.canvas.shapes()]
+        try:
+            added = dataset_service.add_image(dataset_name, self._image_path.name, self._image_path.read_bytes())
+            dataset_service.save_annotations(dataset_name, added["image_id"], added["width"], added["height"], shapes)
+        except DatasetError as e:
+            QMessageBox.warning(self, "Save failed", str(e))
+            return
+
+        self.correction_status.setText(
+            f'Saved this image with {len(shapes)} corrected label(s) to dataset "{dataset_name}". '
+            "Repeat for other wrongly-detected images, then fine-tune from the Train tab."
+        )
+        self.refresh_correction_datasets(select_name=dataset_name)
 
     def _populate_results_table(self, boxes: list[Shape]) -> None:
         self.results_table.setRowCount(len(boxes))

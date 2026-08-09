@@ -96,6 +96,9 @@ class InteractiveCanvas(QGraphicsView):
     def set_tool(self, tool: str) -> None:
         self._tool = tool
 
+    def set_read_only(self, read_only: bool) -> None:
+        self.read_only = read_only
+
     def load_image(self, path: Path) -> None:
         pixmap = QPixmap(str(path))
         self.scene().clear()
@@ -106,8 +109,18 @@ class InteractiveCanvas(QGraphicsView):
         self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
     def set_shapes(self, shapes: list[Shape]) -> None:
+        # _redraw() below rebuilds every graphics item from scratch, which would
+        # otherwise silently drop the current selection (e.g. an ROI filter
+        # change re-rendering the same shapes shouldn't deselect whatever the
+        # user had picked). Re-find the same Shape object (by identity, since
+        # filtering/reordering may still reuse the same instances) afterward.
+        selected_shape = next((self._shapes[i] for i, item in enumerate(self._items) if item.isSelected()), None)
         self._shapes = list(shapes)
         self._redraw()
+        if selected_shape is not None:
+            new_index = next((i for i, s in enumerate(self._shapes) if s is selected_shape), None)
+            if new_index is not None:
+                self._items[new_index].setSelected(True)
 
     def shapes(self) -> list[Shape]:
         return list(self._shapes)

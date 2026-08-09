@@ -206,6 +206,27 @@ table, and clicking a row selects that shape on the canvas — handy for
 matching a specific number in the table (position, angle, ...) back to the
 object it belongs to when several are close together.
 
+### Fixing wrong detections and fine-tuning on them
+
+When a detection is wrong (false positive, missed the real box, wrong
+class), select it — click it on the canvas or its row in the table — then
+click **Enable corrections** in the **"Fix wrong detections &
+fine-tuning"** section. This makes the result canvas editable: **Delete
+selected shape** removes a false positive; the Box/Rotated Box/Ellipse/Pen
+tools let you draw a replacement in the right place with the right class
+(pick it from the **Class** dropdown). Deleting everything and saving is
+valid too — a "no objects here" example helps just as much as a corrected
+box does.
+
+Once the image looks right, pick a dataset from **Save to dataset** and
+click **Save corrected image to dataset** — it's added as a new labeled
+image (detection confidences are dropped; these are ground-truth labels
+now), the same way an uploaded or hand-marked image would be. Repeat across
+however many wrongly-detected images you want to fix, then go to the
+**Train** tab and start a **fine-tune** run on that dataset — this is how
+you turn the model's own mistakes into more training data, without a
+separate labeling pass.
+
 ## Web app
 
 The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)
