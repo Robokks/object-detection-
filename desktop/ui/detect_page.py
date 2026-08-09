@@ -28,7 +28,7 @@ from app.services import model_service
 from .canvas import InteractiveCanvas
 from .workers import FunctionWorker
 
-RESULT_COLUMNS = ["Class", "Shape", "Confidence", "Position (X, Y)", "Box X", "Box Y", "Width", "Height"]
+RESULT_COLUMNS = ["Class", "Shape", "Confidence", "Position (X, Y)", "Angle", "Box X", "Box Y", "Width", "Height"]
 
 SOURCE_LABELS = {"pretrained": "Pretrained", "trained": "Trained by you", "imported": "Imported"}
 
@@ -264,11 +264,13 @@ class DetectPage(QWidget):
             cy = b.center_y if b.center_y is not None else b.y + b.height / 2
             shape_kind = "mask" if len(b.points) >= 3 else "box"
             confidence_text = f"{b.confidence * 100:.1f}%" if b.confidence is not None else "-"
+            angle_text = f"{b.angle:.1f}°" if len(b.points) >= 3 else "-"
             values = [
                 b.class_name,
                 shape_kind,
                 confidence_text,
                 f"({cx:.0f}, {cy:.0f})",
+                angle_text,
                 f"{b.x:.0f}",
                 f"{b.y:.0f}",
                 f"{b.width:.0f}",

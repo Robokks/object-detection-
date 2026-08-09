@@ -144,6 +144,13 @@ the field to use as an object's "position": unlike the box's top-left
 corner, the center stays meaningful regardless of the object's rotation
 (rotating a box around its own center doesn't move the center).
 
+Every shape also carries `angle` — the long-axis orientation in degrees (0
+= horizontal, 90 = vertical), fit from `points` with a minimum-area
+rectangle. It needs an outline to fit, so it's always `0` for a plain
+axis-aligned box; a rotated-box label or a segmentation/SAM mask both
+produce a real angle. The desktop app's Detect tab shows this as an
+**Angle** column next to Position.
+
 ## Requirements
 
 - Python 3.10+
