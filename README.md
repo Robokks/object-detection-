@@ -1,11 +1,22 @@
 # Vision Object Detection Studio
 
-A web app for training a custom object-detection/segmentation model and then
-using it to detect objects (class + position) in new images.
+An app for training a custom object-detection/segmentation model and then
+using it to detect objects (class + position) in new images. Two interfaces
+share the same underlying Python logic and the same data on disk:
+
+- **Desktop app** (`desktop/`): a PySide6 (Qt) app. One process, no server,
+  no browser — launch it and use it. See [Desktop app](#desktop-app) below.
+- **Web app** (`backend/` + `frontend/`): FastAPI backend + React frontend,
+  used from a browser. See [Web app](#web-app) below.
+
+Both read and write the same `backend/data/` folder, so a dataset labeled in
+one shows up in the other.
 
 - **Backend** (`backend/`): FastAPI + [Ultralytics](https://docs.ultralytics.com/)
   (YOLOv8 detect/segment + SAM). Handles dataset storage, labeling, training,
-  model management, and inference.
+  model management, and inference. The desktop app calls this same service
+  layer (`backend/app/services/`, `backend/app/schemas.py`) directly,
+  in-process — it's the shared core, not something only the web app uses.
 - **Frontend** (`frontend/`): React + Vite (TypeScript). Three screens:
   1. **Dataset** — create a dataset, upload images, and label objects with a
      **box**, **rotated box**, **ellipse**, or **pen** (freehand) tool. The
@@ -110,40 +121,46 @@ corner, the center stays meaningful regardless of the object's rotation
 ## Requirements
 
 - Python 3.10+
-- Node.js 18+
+- Node.js 18+ (web app only)
 - A GPU is optional but speeds up training significantly. CPU training works
   for small datasets/models.
 
-## Backend setup
+## Desktop app
+
+A single PySide6 (Qt) window with the same three tabs as the web app —
+Dataset, Train, Detect — calling `backend/app/services/` directly in the
+same process. No server, no browser, nothing else to run.
 
 ```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+pip install -r ../desktop/requirements.txt
+python ../desktop/main.py
 ```
 
-The first time you train or run detection with a pretrained model,
-Ultralytics will download its checkpoint automatically — this requires
-network access. SAM's checkpoint in particular is a large download.
+(`desktop/requirements.txt` pulls in `backend/requirements.txt` too, so if
+you're setting up fresh, installing just that one file is enough:
+`pip install -r desktop/requirements.txt` from the repo root, using any venv
+you like — it doesn't have to be `backend/.venv` specifically, that's just
+what's already used elsewhere in this README.)
 
-All data (datasets, uploaded images, training runs, trained/imported
-weights) is stored under `backend/data/`, which is gitignored.
+**PySide6, not PyQt6** — LGPL-licensed, free to use and distribute
+(including closed-source) with no royalties or subscription.
 
-## Frontend setup
+Labeling works the same as the web app: pick a tool (Box / Rotated Box /
+Ellipse / Pen) and drag on the image. For **Rotated Box**, drag to size, then
+drag the small purple handle that appears to rotate it around its center.
+Click a shape to select it, then **Delete selected shape** (or press
+Delete/Backspace) to remove it. **Suggest cylinders** and **Import
+pre-annotated images** work identically to their web-app counterparts,
+just without a network round-trip.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Since it's Python calling Python directly, dataset edits, training runs, and
+detections all touch `backend/data/` immediately — nothing to sync.
 
-This starts the app at `http://localhost:5173`, configured (via
-`.env.development`) to talk to the backend at `http://localhost:8000`. Run
-both the backend and frontend at the same time.
-
-## Running in PyCharm (no terminal)
+## Web app
 
 The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)
 that appear automatically in the run-configuration dropdown (top toolbar)
