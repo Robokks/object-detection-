@@ -29,7 +29,21 @@ from app.services.dataset_service import DatasetError
 from .canvas import InteractiveCanvas
 from .workers import FunctionWorker
 
-RESULT_COLUMNS = ["Class", "Shape", "Confidence", "Position (X, Y)", "Angle", "Box X", "Box Y", "Width", "Height"]
+RESULT_COLUMNS = [
+    "Class",
+    "Shape",
+    "Confidence",
+    "Position (X, Y)",
+    "Angle",
+    "Left (X, Y)",
+    "Right (X, Y)",
+    "Top (X, Y)",
+    "Bottom (X, Y)",
+    "Box X",
+    "Box Y",
+    "Width",
+    "Height",
+]
 
 SOURCE_LABELS = {"pretrained": "Pretrained", "trained": "Trained by you", "imported": "Imported"}
 
@@ -444,12 +458,22 @@ class DetectPage(QWidget):
             shape_kind = "mask" if len(b.points) >= 3 else "box"
             confidence_text = f"{b.confidence * 100:.1f}%" if b.confidence is not None else "-"
             angle_text = f"{b.angle:.1f}°" if len(b.points) >= 3 else "-"
+            # midpoints of each bounding-box edge (box is always axis-aligned,
+            # same as Box X/Y/Width/Height below — not rotated with the object)
+            left = (b.x, cy)
+            right = (b.x + b.width, cy)
+            top = (cx, b.y)
+            bottom = (cx, b.y + b.height)
             values = [
                 b.class_name,
                 shape_kind,
                 confidence_text,
                 f"({cx:.0f}, {cy:.0f})",
                 angle_text,
+                f"({left[0]:.0f}, {left[1]:.0f})",
+                f"({right[0]:.0f}, {right[1]:.0f})",
+                f"({top[0]:.0f}, {top[1]:.0f})",
+                f"({bottom[0]:.0f}, {bottom[1]:.0f})",
                 f"{b.x:.0f}",
                 f"{b.y:.0f}",
                 f"{b.width:.0f}",

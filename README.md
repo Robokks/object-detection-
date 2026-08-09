@@ -151,6 +151,13 @@ axis-aligned box; a rotated-box label or a segmentation/SAM mask both
 produce a real angle. The desktop app's Detect tab shows this as an
 **Angle** column next to Position.
 
+The desktop Detect tab's results table also breaks the bounding box down
+into **Left / Right / Top / Bottom (X, Y)** columns — the midpoints of each
+box edge (e.g. Left is `(Box X, Position Y)`, Top is `(Position X, Box Y)`)
+— alongside the raw **Box X / Box Y / Width / Height**. Like those, they're
+always axis-aligned (not rotated with the object); for an angled pin's
+actual tip-to-tip endpoints, use Position + Angle together instead.
+
 ## Requirements
 
 - Python 3.10+
