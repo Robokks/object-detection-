@@ -40,6 +40,7 @@ class DetectPage(QWidget):
         self._detect_worker: FunctionWorker | None = None
         self._import_worker: FunctionWorker | None = None
         self._last_boxes: list[Shape] = []
+        self._syncing_selection = False
 
         root = QVBoxLayout(self)
 
@@ -132,6 +133,10 @@ class DetectPage(QWidget):
         self.results_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.results_table.verticalHeader().setVisible(False)
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.results_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.results_table.itemSelectionChanged.connect(self._on_table_selection_changed)
+        self.canvas.shapeSelected.connect(self._on_canvas_shape_selected)
         results_layout.addWidget(self.results_table)
         root.addWidget(results_box, stretch=1)
 
@@ -212,6 +217,30 @@ class DetectPage(QWidget):
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run detection")
         QMessageBox.warning(self, "Detection failed", message)
+
+    # ---- selection sync (canvas <-> results table) --------------------
+
+    def _on_canvas_shape_selected(self, index) -> None:
+        if self._syncing_selection:
+            return
+        self._syncing_selection = True
+        try:
+            if index is None:
+                self.results_table.clearSelection()
+            else:
+                self.results_table.selectRow(index)
+        finally:
+            self._syncing_selection = False
+
+    def _on_table_selection_changed(self) -> None:
+        if self._syncing_selection:
+            return
+        rows = {idx.row() for idx in self.results_table.selectedIndexes()}
+        self._syncing_selection = True
+        try:
+            self.canvas.select_shape(next(iter(rows)) if rows else None)
+        finally:
+            self._syncing_selection = False
 
     # ---- ROI ---------------------------------------------------------
 

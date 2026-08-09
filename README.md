@@ -201,6 +201,11 @@ kept — the status line next to the button shows how many. **Clear ROI**
 removes the restriction. The ROI is per detection run: choosing a new image
 resets it.
 
+Clicking a detected shape on the canvas highlights its row in the results
+table, and clicking a row selects that shape on the canvas — handy for
+matching a specific number in the table (position, angle, ...) back to the
+object it belongs to when several are close together.
+
 ## Web app
 
 The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)

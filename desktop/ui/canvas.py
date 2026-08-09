@@ -50,11 +50,14 @@ RoiRect = tuple[float, float, float, float]  # x, y, width, height, in scene (im
 class InteractiveCanvas(QGraphicsView):
     shapesChanged = Signal(list)  # emits list[Shape]
     roiChanged = Signal(object)  # emits RoiRect | None
+    shapeSelected = Signal(object)  # emits int index into shapes(), or None
 
     def __init__(self, parent=None, read_only: bool = False):
         super().__init__(parent)
         self.read_only = read_only
         self.setScene(QGraphicsScene(self))
+        self.scene().selectionChanged.connect(self._on_scene_selection_changed)
+        self._suspend_selection_signal = False
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setBackgroundBrush(QBrush(QColor("#1a1a1a")))
@@ -108,6 +111,26 @@ class InteractiveCanvas(QGraphicsView):
 
     def shapes(self) -> list[Shape]:
         return list(self._shapes)
+
+    # ---- selection ---------------------------------------------------------
+
+    def _on_scene_selection_changed(self) -> None:
+        if self._suspend_selection_signal:
+            return
+        selected = [i for i, item in enumerate(self._items) if item.isSelected()]
+        self.shapeSelected.emit(selected[0] if selected else None)
+
+    def select_shape(self, index: int | None) -> None:
+        """Programmatically select the shape at `index` (or clear selection
+        for None) without re-emitting `shapeSelected` — for syncing from an
+        external widget (e.g. a results table row click) back onto the canvas.
+        """
+        self._suspend_selection_signal = True
+        try:
+            for i, item in enumerate(self._items):
+                item.setSelected(i == index)
+        finally:
+            self._suspend_selection_signal = False
 
     # ---- region of interest ----------------------------------------------
 
