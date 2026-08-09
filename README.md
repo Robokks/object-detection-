@@ -186,6 +186,14 @@ just without a network round-trip.
 Since it's Python calling Python directly, dataset edits, training runs, and
 detections all touch `backend/data/` immediately — nothing to sync.
 
+On the **Detect** tab, **Set ROI** lets you restrict detections to a region
+of the image: click it, then drag a rectangle on the result canvas. Detection
+still runs on the whole image (accuracy near the ROI's edge isn't affected by
+cropping), but only detections whose center falls inside the rectangle are
+kept — the status line next to the button shows how many. **Clear ROI**
+removes the restriction. The ROI is per detection run: choosing a new image
+resets it.
+
 ## Web app
 
 The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)

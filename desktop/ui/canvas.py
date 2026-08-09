@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
     QGraphicsPixmapItem,
     QGraphicsPolygonItem,
+    QGraphicsRectItem,
     QGraphicsScene,
     QGraphicsView,
 )
@@ -43,8 +44,12 @@ def _shape_render_points(shape: Shape) -> list[tuple[float, float]]:
     return rect_corners(shape.x, shape.y, shape.width, shape.height)
 
 
+RoiRect = tuple[float, float, float, float]  # x, y, width, height, in scene (image pixel) coords
+
+
 class InteractiveCanvas(QGraphicsView):
     shapesChanged = Signal(list)  # emits list[Shape]
+    roiChanged = Signal(object)  # emits RoiRect | None
 
     def __init__(self, parent=None, read_only: bool = False):
         super().__init__(parent)
@@ -70,6 +75,12 @@ class InteractiveCanvas(QGraphicsView):
         self._draw_points: list[tuple[float, float]] = []
         self._draft_item: QGraphicsPolygonItem | QGraphicsEllipseItem | None = None
 
+        self._roi_mode = False
+        self._roi_drawing = False
+        self._roi_start = QPointF()
+        self._roi: RoiRect | None = None
+        self._roi_item: QGraphicsRectItem | None = None
+
     # ---- configuration -------------------------------------------------
 
     def set_classes(self, classes: list[str]) -> None:
@@ -86,6 +97,7 @@ class InteractiveCanvas(QGraphicsView):
         pixmap = QPixmap(str(path))
         self.scene().clear()
         self._items, self._labels, self._handles = [], [], []
+        self._roi, self._roi_item, self._roi_drawing = None, None, False
         self._pixmap_item = self.scene().addPixmap(pixmap)
         self.scene().setSceneRect(QRectF(0, 0, pixmap.width(), pixmap.height()))
         self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
@@ -96,6 +108,37 @@ class InteractiveCanvas(QGraphicsView):
 
     def shapes(self) -> list[Shape]:
         return list(self._shapes)
+
+    # ---- region of interest ----------------------------------------------
+
+    def set_roi_mode(self, enabled: bool) -> None:
+        """When enabled, the next click-drag on the canvas defines the ROI."""
+        self._roi_mode = enabled
+
+    def roi(self) -> RoiRect | None:
+        return self._roi
+
+    def set_roi(self, rect: RoiRect | None) -> None:
+        self._roi = rect
+        self._draw_roi_item()
+        self.roiChanged.emit(self._roi)
+
+    def clear_roi(self) -> None:
+        self.set_roi(None)
+
+    def _draw_roi_item(self) -> None:
+        if self._roi_item is not None:
+            self.scene().removeItem(self._roi_item)
+            self._roi_item = None
+        if self._roi is None:
+            return
+        x, y, w, h = self._roi
+        pen = QPen(QColor("#ffd400"), 2, Qt.PenStyle.DashLine)
+        pen.setCosmetic(True)
+        self._roi_item = QGraphicsRectItem(x, y, w, h)
+        self._roi_item.setPen(pen)
+        self._roi_item.setZValue(1000)
+        self.scene().addItem(self._roi_item)
 
     # ---- rendering -------------------------------------------------------
 
@@ -146,6 +189,12 @@ class InteractiveCanvas(QGraphicsView):
     # ---- mouse interaction (drawing) -------------------------------------
 
     def mousePressEvent(self, event):  # noqa: N802
+        if self._roi_mode:
+            super().mousePressEvent(event)
+            self._roi_drawing = True
+            self._roi_start = self.mapToScene(event.pos())
+            self._update_roi_draft(self._roi_start)
+            return
         if self.read_only:
             super().mousePressEvent(event)
             return
@@ -160,11 +209,19 @@ class InteractiveCanvas(QGraphicsView):
 
     def mouseMoveEvent(self, event):  # noqa: N802
         super().mouseMoveEvent(event)
+        if self._roi_drawing:
+            self._update_roi_draft(self.mapToScene(event.pos()))
+            return
         if self._drawing:
             self._update_draft(self.mapToScene(event.pos()))
 
     def mouseReleaseEvent(self, event):  # noqa: N802
         super().mouseReleaseEvent(event)
+        if self._roi_drawing:
+            self._roi_drawing = False
+            self._update_roi_draft(self.mapToScene(event.pos()))
+            self._commit_roi()
+            return
         if self._drawing:
             self._drawing = False
             # a release doesn't always follow a move at the same point (e.g. a
@@ -172,6 +229,20 @@ class InteractiveCanvas(QGraphicsView):
             # tests, or a very fast drag) — capture the final position here too.
             self._draw_current = self.mapToScene(event.pos())
             self._commit_draft()
+
+    def _update_roi_draft(self, scene_pos: QPointF) -> None:
+        x0, y0 = self._roi_start.x(), self._roi_start.y()
+        x1, y1 = scene_pos.x(), scene_pos.y()
+        x, y = min(x0, x1), min(y0, y1)
+        w, h = abs(x1 - x0), abs(y1 - y0)
+        self._roi = (x, y, w, h)
+        self._draw_roi_item()
+
+    def _commit_roi(self) -> None:
+        if self._roi is not None and (self._roi[2] < MIN_DRAW_SIZE or self._roi[3] < MIN_DRAW_SIZE):
+            self._roi = None
+            self._draw_roi_item()
+        self.roiChanged.emit(self._roi)
 
     def keyPressEvent(self, event):  # noqa: N802
         if not self.read_only and event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):

@@ -39,6 +39,7 @@ class DetectPage(QWidget):
         self._image_path: Path | None = None
         self._detect_worker: FunctionWorker | None = None
         self._import_worker: FunctionWorker | None = None
+        self._last_boxes: list[Shape] = []
 
         root = QVBoxLayout(self)
 
@@ -103,6 +104,19 @@ class DetectPage(QWidget):
         image_row.addWidget(self.image_path_label, stretch=1)
         image_row.addWidget(self.run_btn)
         run_layout.addLayout(image_row)
+
+        roi_row = QHBoxLayout()
+        self.roi_btn = QPushButton("Set ROI")
+        self.roi_btn.setCheckable(True)
+        self.roi_btn.setToolTip("Drag a rectangle on the image below to limit detections to that region.")
+        self.roi_btn.toggled.connect(self._on_roi_mode_toggled)
+        self.clear_roi_btn = QPushButton("Clear ROI")
+        self.clear_roi_btn.clicked.connect(self._on_clear_roi)
+        self.roi_status_label = QLabel("ROI: full image")
+        roi_row.addWidget(self.roi_btn)
+        roi_row.addWidget(self.clear_roi_btn)
+        roi_row.addWidget(self.roi_status_label, stretch=1)
+        run_layout.addLayout(roi_row)
         root.addWidget(run_box)
 
         # --- results ---
@@ -110,6 +124,7 @@ class DetectPage(QWidget):
         results_layout = QVBoxLayout(results_box)
         self.canvas = InteractiveCanvas(read_only=True)
         self.canvas.setMinimumHeight(360)
+        self.canvas.roiChanged.connect(self._on_roi_changed)
         results_layout.addWidget(self.canvas)
 
         self.results_table = QTableWidget(0, len(RESULT_COLUMNS))
@@ -161,9 +176,12 @@ class DetectPage(QWidget):
         if f:
             self._image_path = Path(f)
             self.image_path_label.setText(self._image_path.name)
-            self.canvas.load_image(self._image_path)
+            self.canvas.load_image(self._image_path)  # also resets any ROI from a previous image
             self.canvas.set_shapes([])
             self.results_table.setRowCount(0)
+            self._last_boxes = []
+            self.roi_btn.setChecked(False)
+            self.roi_status_label.setText("ROI: full image")
 
     def _on_run_detection(self) -> None:
         model_id = self.model_combo.currentData()
@@ -186,14 +204,58 @@ class DetectPage(QWidget):
     def _on_detect_succeeded(self, result: DetectionResult) -> None:
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run detection")
+        self._last_boxes = result.boxes
         self.canvas.set_classes(list({b.class_name for b in result.boxes}))
-        self.canvas.set_shapes(result.boxes)
-        self._populate_results_table(result.boxes)
+        self._apply_roi_filter()
 
     def _on_detect_failed(self, message: str) -> None:
         self.run_btn.setEnabled(True)
         self.run_btn.setText("Run detection")
         QMessageBox.warning(self, "Detection failed", message)
+
+    # ---- ROI ---------------------------------------------------------
+
+    def _on_roi_mode_toggled(self, checked: bool) -> None:
+        self.canvas.set_roi_mode(checked)
+        self.roi_btn.setText("Drawing ROI… drag on image" if checked else "Set ROI")
+
+    def _on_clear_roi(self) -> None:
+        self.canvas.clear_roi()
+
+    def _on_roi_changed(self, roi) -> None:
+        if roi is not None:
+            self.roi_btn.setChecked(False)  # one drag defines it; click "Set ROI" again to redraw
+        self._apply_roi_filter()
+
+    def _apply_roi_filter(self) -> None:
+        roi = self.canvas.roi()
+        boxes = self._filter_by_roi(self._last_boxes, roi)
+        self.canvas.set_shapes(boxes)
+        self._populate_results_table(boxes)
+        self.roi_status_label.setText(self._roi_status_text(roi, len(boxes), len(self._last_boxes)))
+
+    @staticmethod
+    def _roi_status_text(roi, kept: int, total: int) -> str:
+        if roi is None:
+            return "ROI: full image"
+        x, y, w, h = roi
+        text = f"ROI: ({x:.0f}, {y:.0f}) to ({x + w:.0f}, {y + h:.0f})"
+        if total:
+            text += f" — {kept} of {total} detections inside"
+        return text
+
+    @staticmethod
+    def _filter_by_roi(boxes: list[Shape], roi) -> list[Shape]:
+        if roi is None:
+            return boxes
+        rx, ry, rw, rh = roi
+
+        def inside(b: Shape) -> bool:
+            cx = b.center_x if b.center_x is not None else b.x + b.width / 2
+            cy = b.center_y if b.center_y is not None else b.y + b.height / 2
+            return rx <= cx <= rx + rw and ry <= cy <= ry + rh
+
+        return [b for b in boxes if inside(b)]
 
     def _populate_results_table(self, boxes: list[Shape]) -> None:
         self.results_table.setRowCount(len(boxes))
