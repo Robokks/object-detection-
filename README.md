@@ -117,13 +117,22 @@ Open the notebook — either upload `colab/train_on_colab.ipynb` to
 [Google Colab](https://colab.research.google.com) yourself, or use the
 **"Open in Google Colab"** PyCharm run configuration (`backend/scripts/open_colab.py`),
 which opens it straight from GitHub in your browser, always the current
-version, no manual upload needed. Set the runtime to a (free) T4 GPU, set
-`CLASS_NAME` near the top if you're uploading raw photos, and
-`Runtime → Run all`. When it reaches the upload cell, upload whichever zip
-you made. It fine-tunes `yolov8n-seg` — the same architecture the app
-trains locally — and downloads a `trained-model.zip` containing `best.pt`
-when done. Bring that file back to **Detect → Import a model** (desktop or
-web) to use it, with task set to "Instance segmentation".
+version, no manual upload needed. Then:
+
+1. `Runtime` menu → `Change runtime type` → **T4 GPU** → Save.
+2. `Runtime` → `Run all`.
+3. First upload prompt: your dataset zip (either of the two formats above).
+4. Second upload prompt is **optional** — upload a previous `best.pt` to
+   continue fine-tuning from it (same idea as the desktop app's Train tab
+   "Continue from checkpoint"), or click **Cancel** to start from stock
+   COCO weights instead.
+
+It fine-tunes `yolov8n-seg` — the same architecture the app trains locally
+— and downloads a `trained-model.zip` containing `best.pt` when done. Bring
+that file back to **Detect → Import a model** (desktop or web) to use it,
+with task set to "Instance segmentation" — and it's now also a valid
+"previous best.pt" to feed back into step 4 next time, so each round can
+build on the last instead of starting over.
 
 There's no supported way to run Colab's free GPU from a terminal/CI
 pipeline — it's a browser-based product, and Google doesn't expose that
