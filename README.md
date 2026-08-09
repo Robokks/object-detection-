@@ -158,6 +158,59 @@ box edge (e.g. Left is `(Box X, Position Y)`, Top is `(Position X, Box Y)`)
 always axis-aligned (not rotated with the object); for an angled pin's
 actual tip-to-tip endpoints, use Position + Angle together instead.
 
+### Standalone detection script (no app, just a JSON file)
+
+`backend/scripts/detect_to_json.py` runs a model on an image with no server
+and no GUI — for scripting, batch processing, or feeding another program.
+Open it, edit the settings block near the top (`WEIGHTS_PATH`, `IMAGE_PATH`,
+`TASK`, `CONFIDENCE`, `OUTPUT_PATH`), and run it — PyCharm's ▶ button next
+to `if __name__ == "__main__":` works, same as `backend/run.py`. Those same
+settings can be overridden with command-line flags instead
+(`--weights`, `--image`, `--task`, `--confidence`, `--output` —
+`--help` for details), so it also works as a normal CLI tool if you'd
+rather not edit the file.
+
+```bash
+cd backend
+python scripts/detect_to_json.py --weights best.pt --image photo.jpg --task segment
+```
+
+`IMAGE_PATH`/`--image` can also point at a folder — every image in it gets
+detected and the JSON groups results per image. The output has exactly the
+same fields as the desktop Detect tab's results table (both are built from
+`app/services/report_service.py`, so they can't drift apart): class,
+shape (`box`/`mask`), confidence, center position, orientation angle,
+left/right/top/bottom edge midpoints, and the bounding box. Example for a
+single image:
+
+```json
+{
+  "model": {"weights": "best.pt", "task": "segment"},
+  "confidence_threshold": 0.25,
+  "image": "photo.jpg",
+  "image_width": 1920,
+  "image_height": 1080,
+  "detections": [
+    {
+      "class_name": "pin",
+      "shape": "mask",
+      "confidence": 0.91,
+      "position": {"x": 512.3, "y": 340.1},
+      "angle_degrees": 37.2,
+      "left": {"x": 480.0, "y": 340.1},
+      "right": {"x": 544.6, "y": 340.1},
+      "top": {"x": 512.3, "y": 310.0},
+      "bottom": {"x": 512.3, "y": 370.2},
+      "box": {"x": 480.0, "y": 310.0, "width": 64.6, "height": 60.2}
+    }
+  ]
+}
+```
+
+This doesn't touch the app's model registry or `backend/data/` — point it
+at any `.pt` checkpoint (e.g. `best.pt` from the Colab notebook) and any
+image, independent of whatever's imported into the desktop/web apps.
+
 ## Requirements
 
 - Python 3.10+

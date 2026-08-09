@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.schemas import DetectionResult, ModelTask, Shape
-from app.services import dataset_service, model_service
+from app.services import dataset_service, model_service, report_service
 from app.services.dataset_service import DatasetError
 
 from .canvas import InteractiveCanvas
@@ -451,33 +451,28 @@ class DetectPage(QWidget):
         self.refresh_correction_datasets(select_name=dataset_name)
 
     def _populate_results_table(self, boxes: list[Shape]) -> None:
+        # Sourced from report_service.shape_to_report — the same helper the
+        # standalone scripts/detect_to_json.py uses — so the table and the
+        # JSON export always agree on these fields.
         self.results_table.setRowCount(len(boxes))
         for row, b in enumerate(boxes):
-            cx = b.center_x if b.center_x is not None else b.x + b.width / 2
-            cy = b.center_y if b.center_y is not None else b.y + b.height / 2
-            shape_kind = "mask" if len(b.points) >= 3 else "box"
-            confidence_text = f"{b.confidence * 100:.1f}%" if b.confidence is not None else "-"
-            angle_text = f"{b.angle:.1f}°" if len(b.points) >= 3 else "-"
-            # midpoints of each bounding-box edge (box is always axis-aligned,
-            # same as Box X/Y/Width/Height below — not rotated with the object)
-            left = (b.x, cy)
-            right = (b.x + b.width, cy)
-            top = (cx, b.y)
-            bottom = (cx, b.y + b.height)
+            r = report_service.shape_to_report(b)
+            confidence_text = f"{r['confidence'] * 100:.1f}%" if r["confidence"] is not None else "-"
+            angle_text = f"{r['angle_degrees']:.1f}°" if r["angle_degrees"] is not None else "-"
             values = [
-                b.class_name,
-                shape_kind,
+                r["class_name"],
+                r["shape"],
                 confidence_text,
-                f"({cx:.0f}, {cy:.0f})",
+                f"({r['position']['x']:.0f}, {r['position']['y']:.0f})",
                 angle_text,
-                f"({left[0]:.0f}, {left[1]:.0f})",
-                f"({right[0]:.0f}, {right[1]:.0f})",
-                f"({top[0]:.0f}, {top[1]:.0f})",
-                f"({bottom[0]:.0f}, {bottom[1]:.0f})",
-                f"{b.x:.0f}",
-                f"{b.y:.0f}",
-                f"{b.width:.0f}",
-                f"{b.height:.0f}",
+                f"({r['left']['x']:.0f}, {r['left']['y']:.0f})",
+                f"({r['right']['x']:.0f}, {r['right']['y']:.0f})",
+                f"({r['top']['x']:.0f}, {r['top']['y']:.0f})",
+                f"({r['bottom']['x']:.0f}, {r['bottom']['y']:.0f})",
+                f"{r['box']['x']:.0f}",
+                f"{r['box']['y']:.0f}",
+                f"{r['box']['width']:.0f}",
+                f"{r['box']['height']:.0f}",
             ]
             for col, value in enumerate(values):
                 self.results_table.setItem(row, col, QTableWidgetItem(value))

@@ -21,6 +21,16 @@ def _polygon_bbox(points: list[list[float]]) -> tuple[float, float, float, float
 def run_detection(model_id: str, image_bytes: bytes, confidence: float) -> DetectionResult:
     model = model_service.load_model(model_id)
     _, task = model_service.resolve(model_id)
+    return run_detection_with_model(model, task, image_bytes, confidence)
+
+
+def run_detection_with_model(model, task: str, image_bytes: bytes, confidence: float) -> DetectionResult:
+    """Same as `run_detection`, but takes an already-loaded Ultralytics model
+    and its task instead of a model id registered with `model_service` — for
+    callers (e.g. the standalone `scripts/detect_to_json.py`) that load a
+    checkpoint directly from a file path rather than through the app's model
+    registry.
+    """
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     width, height = image.size
 
