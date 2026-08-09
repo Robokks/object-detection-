@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.schemas import TrainRequest
-from app.services import dataset_service, train_service
+from app.services import dataset_service, model_service, train_service
 from app.services.train_service import TrainError
 
 POLL_INTERVAL_MS = 3000
@@ -69,6 +69,13 @@ class TrainPage(QWidget):
         self.base_model_combo.addItem("yolov8m", "yolov8m")
         form.addRow("Base architecture", self.base_model_combo)
 
+        self.checkpoint_combo = QComboBox()
+        self.checkpoint_combo.setToolTip(
+            "Finetune mode only: continue training from this checkpoint (e.g. a previous run, or "
+            "a model you imported) instead of stock COCO weights. Ignored in scratch mode."
+        )
+        form.addRow("Continue from checkpoint", self.checkpoint_combo)
+
         self.epochs_spin = QSpinBox()
         self.epochs_spin.setRange(1, 10000)
         self.epochs_spin.setValue(50)
@@ -106,6 +113,7 @@ class TrainPage(QWidget):
         self._timer.start(POLL_INTERVAL_MS)
 
         self.refresh_datasets()
+        self.refresh_checkpoints()
         self._refresh_jobs()
 
     def refresh_datasets(self) -> None:
@@ -118,12 +126,30 @@ class TrainPage(QWidget):
             if idx >= 0:
                 self.dataset_combo.setCurrentIndex(idx)
 
+    def refresh_checkpoints(self) -> None:
+        current = self.checkpoint_combo.currentData()
+        self.checkpoint_combo.blockSignals(True)
+        self.checkpoint_combo.clear()
+        self.checkpoint_combo.addItem("-- none, start from stock COCO weights --", "")
+        for m in model_service.list_models():
+            if m.source in ("trained", "imported"):
+                self.checkpoint_combo.addItem(f"[{m.source}] {m.label}", m.id)
+        self.checkpoint_combo.blockSignals(False)
+        if current:
+            idx = self.checkpoint_combo.findData(current)
+            if idx >= 0:
+                self.checkpoint_combo.setCurrentIndex(idx)
+
     def _on_start_training(self) -> None:
         dataset_name = self.dataset_combo.currentData()
         run_name = self.run_name_edit.text().strip()
         if not dataset_name or not run_name:
             QMessageBox.information(self, "Missing info", "Choose a dataset and give the run a name.")
             return
+        checkpoint_id = self.checkpoint_combo.currentData()
+        base_checkpoint_path = None
+        if checkpoint_id:
+            base_checkpoint_path, _ = model_service.resolve(checkpoint_id)
         req = TrainRequest(
             dataset_name=dataset_name,
             run_name=run_name,
@@ -132,6 +158,7 @@ class TrainPage(QWidget):
             image_size=self.imgsz_spin.value(),
             batch_size=self.batch_spin.value(),
             base_model=self.base_model_combo.currentData(),
+            base_checkpoint_path=base_checkpoint_path,
         )
         try:
             train_service.start_training(req)
@@ -141,6 +168,7 @@ class TrainPage(QWidget):
         self._refresh_jobs()
 
     def _refresh_jobs(self) -> None:
+        self.refresh_checkpoints()
         jobs = train_service.list_jobs()
         self.jobs_table.setRowCount(len(jobs))
         for row, job in enumerate(jobs):

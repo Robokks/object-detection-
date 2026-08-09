@@ -88,6 +88,14 @@ class TrainRequest(BaseModel):
     image_size: int = 640
     batch_size: int = 16
     base_model: str = "yolov8n"
+    base_checkpoint_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "finetune only: continue training from this checkpoint file instead of stock "
+            "'{base_model}-seg.pt' COCO weights — e.g. a previous run's best.pt (from this app "
+            "or from the Colab notebook). Ignored in scratch mode."
+        ),
+    )
 
 
 class TrainJobStatus(BaseModel):

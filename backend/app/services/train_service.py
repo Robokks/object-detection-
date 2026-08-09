@@ -65,7 +65,10 @@ def _run_training(req: TrainRequest) -> None:
         # Labels are always exported as polygons (boxes are 4-point polygons),
         # so training always targets the instance-segmentation task/architecture.
         if req.mode == "finetune":
-            model = YOLO(f"{base_model}-seg.pt")
+            if req.base_checkpoint_path:
+                model = YOLO(req.base_checkpoint_path)
+            else:
+                model = YOLO(f"{base_model}-seg.pt")
         else:
             model = YOLO(f"{base_model}-seg.yaml")
 
