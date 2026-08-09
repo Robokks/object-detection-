@@ -100,19 +100,27 @@ and immediately become selectable on the Detect page.
 
 Both the desktop app and this backend train on whatever CPU/GPU is on the
 machine running them — on a CPU-only machine, that's slow. `colab/` has a
-faster path that doesn't need any local GPU:
+faster path that doesn't need any local GPU, and it accepts **either** of
+two zip formats — pick whichever is less hassle:
 
-```bash
-cd backend
-python scripts/export_for_colab.py <dataset_name>   # writes <dataset_name>-dataset.zip
-```
+- **A plain zip of your own photos with hand-drawn red outlines on them** —
+  zip them up yourself, no export step needed. The notebook extracts the
+  outlines on the Colab machine itself, using the exact same code as
+  **"Import pre-annotated images"**.
+- **A pre-built dataset export**, if you'd rather do that step locally:
+  ```bash
+  cd backend
+  python scripts/export_for_colab.py <dataset_name>   # writes <dataset_name>-dataset.zip
+  ```
 
-Upload that zip and `colab/train_on_colab.ipynb` to
+Upload `colab/train_on_colab.ipynb` to
 [Google Colab](https://colab.research.google.com), set the runtime to a
-(free) T4 GPU, and `Runtime → Run all`. It fine-tunes `yolov8n-seg` — the
-same architecture the app trains locally — and downloads a `trained-model.zip`
-containing `best.pt` when done. Bring that file back to **Detect → Import a
-model** (desktop or web) to use it, with task set to "Instance segmentation".
+(free) T4 GPU, set `CLASS_NAME` near the top if you're uploading raw photos,
+and `Runtime → Run all`. When it reaches the upload cell, upload whichever
+zip you made. It fine-tunes `yolov8n-seg` — the same architecture the app
+trains locally — and downloads a `trained-model.zip` containing `best.pt`
+when done. Bring that file back to **Detect → Import a model** (desktop or
+web) to use it, with task set to "Instance segmentation".
 
 ### Models
 
