@@ -113,14 +113,26 @@ two zip formats — pick whichever is less hassle:
   python scripts/export_for_colab.py <dataset_name>   # writes <dataset_name>-dataset.zip
   ```
 
-Upload `colab/train_on_colab.ipynb` to
-[Google Colab](https://colab.research.google.com), set the runtime to a
-(free) T4 GPU, set `CLASS_NAME` near the top if you're uploading raw photos,
-and `Runtime → Run all`. When it reaches the upload cell, upload whichever
-zip you made. It fine-tunes `yolov8n-seg` — the same architecture the app
+Open the notebook — either upload `colab/train_on_colab.ipynb` to
+[Google Colab](https://colab.research.google.com) yourself, or use the
+**"Open in Google Colab"** PyCharm run configuration (`backend/scripts/open_colab.py`),
+which opens it straight from GitHub in your browser, always the current
+version, no manual upload needed. Set the runtime to a (free) T4 GPU, set
+`CLASS_NAME` near the top if you're uploading raw photos, and
+`Runtime → Run all`. When it reaches the upload cell, upload whichever zip
+you made. It fine-tunes `yolov8n-seg` — the same architecture the app
 trains locally — and downloads a `trained-model.zip` containing `best.pt`
 when done. Bring that file back to **Detect → Import a model** (desktop or
 web) to use it, with task set to "Instance segmentation".
+
+There's no supported way to run Colab's free GPU from a terminal/CI
+pipeline — it's a browser-based product, and Google doesn't expose that
+tier's compute through an API or CLI. `open_colab.py` just saves the
+"find and re-upload the notebook" step each time; you still do the T4 GPU
+selection, `Runtime → Run all`, and the upload by hand on the page it
+opens. (Colab does support pointing it at a *local* Jupyter kernel instead
+of its own — "Connect to a local runtime" — but that trades away the free
+GPU for your own CPU, the opposite of what this is for.)
 
 ### Models
 
@@ -332,6 +344,9 @@ once you open the project folder in PyCharm — no command line needed:
   Node interpreter the same way if prompted.
 - **Run Everything (Backend + Frontend)** — a compound configuration that
   starts both with a single click.
+- **Open in Google Colab** — opens the training notebook straight from
+  GitHub in your browser (see [Training faster on a free
+  GPU](#training-faster-on-a-free-gpu-colab) above).
 
 Pick a configuration from the dropdown and click the green ▶. Fallback if a
 configuration doesn't show up cleanly (PyCharm versions vary): open
