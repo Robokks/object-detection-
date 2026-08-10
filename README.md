@@ -136,11 +136,19 @@ with the same full detail as the desktop app's Detect tab and
 orientation angle, left/right/top/bottom edge midpoints, and the bounding
 box for every detection. Useful for a quick sanity check on the new
 weights before bothering to download and import them anywhere. Finally it
-downloads a `trained-model.zip` containing `best.pt`. Bring that file back
-to **Detect → Import a model** (desktop or web) to use it, with task set to
-"Instance segmentation" — and it's now also a valid "previous best.pt" to
+downloads **`training-run.zip`** — not just `best.pt`, but the whole
+Ultralytics run folder: `weights/` (`best.pt` + `last.pt`), the confusion
+matrix, precision/recall/F1 curves, `results.csv`/`results.png`,
+`args.yaml`, and the training/validation batch preview images — the same
+files you'd see in `backend/data/runs/<run_name>/` from a local run, just
+zipped up since Colab can't write directly to your disk. Pull `best.pt`
+out of `weights/` for **Detect → Import a model** (desktop or web, task
+"Instance segmentation") — and it's now also a valid "previous best.pt" to
 feed back into step 4 next time, so each round can build on the last
-instead of starting over.
+instead of starting over. The rest of the zip is for judging how the run
+actually went (is precision/recall trending the right way, is the
+confusion matrix clean, etc.) — the same diagnostics you'd check after a
+local training run.
 
 There's no supported way to run Colab's free GPU from a terminal/CI
 pipeline — it's a browser-based product, and Google doesn't expose that
