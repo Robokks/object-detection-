@@ -128,11 +128,19 @@ version, no manual upload needed. Then:
    COCO weights instead.
 
 It fine-tunes `yolov8n-seg` — the same architecture the app trains locally
-— and downloads a `trained-model.zip` containing `best.pt` when done. Bring
-that file back to **Detect → Import a model** (desktop or web) to use it,
-with task set to "Instance segmentation" — and it's now also a valid
-"previous best.pt" to feed back into step 4 next time, so each round can
-build on the last instead of starting over.
+— then (5) optionally lets you upload a test image (or falls back to a few
+images from the validation split if you skip that) and runs the
+just-trained model on it right there, downloading `colab-detections.json`
+with the same full detail as the desktop app's Detect tab and
+`scripts/detect_to_json.py` — class, confidence, center position,
+orientation angle, left/right/top/bottom edge midpoints, and the bounding
+box for every detection. Useful for a quick sanity check on the new
+weights before bothering to download and import them anywhere. Finally it
+downloads a `trained-model.zip` containing `best.pt`. Bring that file back
+to **Detect → Import a model** (desktop or web) to use it, with task set to
+"Instance segmentation" — and it's now also a valid "previous best.pt" to
+feed back into step 4 next time, so each round can build on the last
+instead of starting over.
 
 There's no supported way to run Colab's free GPU from a terminal/CI
 pipeline — it's a browser-based product, and Google doesn't expose that
