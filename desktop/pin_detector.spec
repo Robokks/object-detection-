@@ -19,7 +19,7 @@ from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-REPO_ROOT = Path(SPECPATH).resolve().parent.parent
+REPO_ROOT = Path(SPECPATH).resolve().parent
 BACKEND_DIR = REPO_ROOT / "backend"
 
 # collect_submodules() below runs as plain Python right now, while this
