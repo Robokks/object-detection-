@@ -49,7 +49,12 @@ def _scan_weights_dir(directory: Path, source: str) -> list[ModelInfo]:
         meta_file = directory / f"{run_name}.meta.json"
         if not meta_file.exists():
             continue
-        meta = json.loads(meta_file.read_text())
+        try:
+            meta = json.loads(meta_file.read_text())
+        except json.JSONDecodeError:
+            # a truncated/empty .meta.json (interrupted write, manual edit, etc.)
+            # shouldn't take every model in the list down with it — skip just this one.
+            continue
         models.append(
             ModelInfo(
                 id=f"{source}:{run_name}",
