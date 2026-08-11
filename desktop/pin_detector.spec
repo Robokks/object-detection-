@@ -14,12 +14,22 @@ it, it's not a single portable file. onedir also rebuilds much faster than
 PyTorch + Ultralytics is a large bundle.
 """
 
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 REPO_ROOT = Path(SPECPATH).resolve().parent.parent
 BACKEND_DIR = REPO_ROOT / "backend"
+
+# collect_submodules() below runs as plain Python right now, while this
+# spec file is being parsed — it needs `app.services` importable in *this*
+# process to walk its submodules. `pathex` passed to Analysis() further
+# down only affects PyInstaller's own later static-analysis pass, not this
+# line, so without this it silently finds nothing and app.* never makes it
+# into the build at all (no build-time error — just a runtime
+# "ModuleNotFoundError: No module named 'app'" when you launch the .exe).
+sys.path.insert(0, str(BACKEND_DIR))
 
 datas = []
 binaries = []
