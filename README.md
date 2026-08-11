@@ -349,6 +349,36 @@ however many wrongly-detected images you want to fix, then go to the
 you turn the model's own mistakes into more training data, without a
 separate labeling pass.
 
+### Building a standalone .exe
+
+To hand the desktop app to someone without them installing Python: on
+Windows, double-click **`desktop\build_exe.bat`** — no typing required, it
+installs [PyInstaller](https://pyinstaller.org/) if needed and builds
+`desktop\dist\PinDetector\PinDetector.exe`. Zip that whole `PinDetector`
+folder (the `.exe` needs the rest of it alongside it — it's a "folder"
+build, not a single portable file, since that's faster to build/rebuild
+than a single-file `.exe` for a bundle this size) and copy it to another
+Windows machine; no Python, no PyCharm, no venv needed there.
+
+It reuses whatever virtual environment the "Backend (FastAPI)" PyCharm run
+configuration uses (`backend\.venv`) — set that up first if you haven't
+(**Settings → Project → Python Interpreter → Add Interpreter → Virtualenv →
+New**, pointed at `backend\.venv`) before running the `.bat` file. Rerun it
+after code changes to rebuild; the first build is slow (bundling PySide6 +
+PyTorch + Ultralytics together is a few hundred MB), later ones are
+faster.
+
+Prefer PyCharm to a `.bat` file, or want to run it from a terminal
+yourself? `desktop\build_exe.py` (also has its own **"Build desktop .exe"**
+PyCharm run configuration) and `desktop\pin_detector.spec` do the same
+build — the `.bat` file just calls the same spec file.
+
+This build hasn't been run end-to-end on Windows — PyInstaller output is
+genuinely platform-specific, so if the first attempt hits a "module not
+found" error at runtime, it's almost always fixed by adding that module's
+name to `hiddenimports` in `pin_detector.spec` and rebuilding; say what the
+error was and it can be fixed properly.
+
 ## Web app
 
 The repo ships with shared PyCharm Run Configurations (`.idea/runConfigurations/`)

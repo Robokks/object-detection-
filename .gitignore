@@ -10,6 +10,11 @@ desktop/.venv/
 desktop/__pycache__/
 desktop/**/__pycache__/
 
+# PyInstaller build output (build_exe.py) — regenerate locally, don't commit
+desktop/build/
+desktop/dist/
+desktop/*.spec.bak
+
 # Ultralytics artifacts that may land at repo root if run from there
 runs/
 *.pt
