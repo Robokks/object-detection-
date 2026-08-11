@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap, QPolygonF
+from PySide6.QtGui import QBrush, QColor, QKeySequence, QPainter, QPen, QPixmap, QPolygonF
 from PySide6.QtWidgets import (
     QGraphicsEllipseItem,
     QGraphicsPixmapItem,
@@ -36,6 +36,7 @@ from .shape_items import (
 
 MIN_DRAW_SIZE = 4.0
 MIN_PATH_POINT_DISTANCE = 2.0
+MAX_UNDO_HISTORY = 20
 
 
 def _shape_render_points(shape: Shape) -> list[tuple[float, float]]:
@@ -84,6 +85,8 @@ class InteractiveCanvas(QGraphicsView):
         self._roi: RoiRect | None = None
         self._roi_item: QGraphicsRectItem | None = None
 
+        self._history: list[list[Shape]] = []
+
     # ---- configuration -------------------------------------------------
 
     def set_classes(self, classes: list[str]) -> None:
@@ -104,6 +107,7 @@ class InteractiveCanvas(QGraphicsView):
         self.scene().clear()
         self._items, self._labels, self._handles = [], [], []
         self._roi, self._roi_item, self._roi_drawing = None, None, False
+        self._history = []
         self._pixmap_item = self.scene().addPixmap(pixmap)
         self.scene().setSceneRect(QRectF(0, 0, pixmap.width(), pixmap.height()))
         self.fitInView(self._pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
@@ -144,6 +148,28 @@ class InteractiveCanvas(QGraphicsView):
                 item.setSelected(i == index)
         finally:
             self._suspend_selection_signal = False
+
+    # ---- undo --------------------------------------------------------------
+
+    def _push_history(self) -> None:
+        """Snapshot the current shapes before a mutation (draw/delete/rotate)
+        so `undo()` can restore it. Shape objects themselves are never
+        mutated in place — edits always produce a new object or a new
+        list — so a shallow copy of the list is a safe, cheap snapshot.
+        """
+        self._history.append(list(self._shapes))
+        if len(self._history) > MAX_UNDO_HISTORY:
+            self._history.pop(0)
+
+    def can_undo(self) -> bool:
+        return bool(self._history)
+
+    def undo(self) -> None:
+        if not self._history:
+            return
+        previous = self._history.pop()
+        self.set_shapes(previous)
+        self.shapesChanged.emit(self.shapes())
 
     # ---- region of interest ----------------------------------------------
 
@@ -214,6 +240,7 @@ class InteractiveCanvas(QGraphicsView):
         return item
 
     def _on_rotate_commit(self, index: int, points: list[tuple[float, float]]) -> None:
+        self._push_history()
         shape = self._shapes[index]
         x, y, w, h = bbox_from_points(points)
         updated = shape.model_copy(update={"points": [[px, py] for px, py in points], "x": x, "y": y, "width": w, "height": h})
@@ -281,6 +308,9 @@ class InteractiveCanvas(QGraphicsView):
         self.roiChanged.emit(self._roi)
 
     def keyPressEvent(self, event):  # noqa: N802
+        if not self.read_only and event.matches(QKeySequence.StandardKey.Undo):
+            self.undo()
+            return
         if not self.read_only and event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             self.delete_selected()
             return
@@ -289,6 +319,7 @@ class InteractiveCanvas(QGraphicsView):
     def delete_selected(self) -> None:
         for i, item in enumerate(self._items):
             if item.isSelected():
+                self._push_history()
                 del self._shapes[i]
                 self.set_shapes(self._shapes)
                 self.shapesChanged.emit(self.shapes())
@@ -368,6 +399,7 @@ class InteractiveCanvas(QGraphicsView):
 
         if shape is None:
             return
+        self._push_history()
         self._shapes.append(shape)
         self._add_shape_visual(shape)
         self.shapesChanged.emit(self.shapes())

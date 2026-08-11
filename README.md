@@ -340,6 +340,11 @@ tools let you draw a replacement in the right place with the right class
 valid too — a "no objects here" example helps just as much as a corrected
 box does.
 
+Drew a box in the wrong spot? **Undo last change** (or **Ctrl+Z** while the
+canvas has focus) steps back one draw/delete/rotate at a time — it's not
+limited to just the most recent action, keep clicking it to keep undoing
+further back, up to the last 20 changes on this image.
+
 Once the image looks right, pick a dataset from **Save to dataset** and
 click **Save corrected image to dataset** — it's added as a new labeled
 image (detection confidences are dropped; these are ground-truth labels

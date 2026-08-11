@@ -184,6 +184,11 @@ class DetectPage(QWidget):
         self.delete_shape_btn.setEnabled(False)
         self.delete_shape_btn.clicked.connect(lambda: self.canvas.delete_selected())
         correction_row.addWidget(self.delete_shape_btn)
+        self.undo_btn = QPushButton("Undo last change")
+        self.undo_btn.setEnabled(False)
+        self.undo_btn.setToolTip("Ctrl+Z also works while the canvas has focus.")
+        self.undo_btn.clicked.connect(lambda: self.canvas.undo())
+        correction_row.addWidget(self.undo_btn)
         correction_row.addWidget(self.correction_btn)
         fix_layout.addLayout(correction_row)
 
@@ -360,11 +365,12 @@ class DetectPage(QWidget):
     # ---- fix wrong detections, save for fine-tuning --------------------
 
     def _on_canvas_shapes_edited(self, shapes: list[Shape]) -> None:
-        # fires when a correction (delete/redraw) changes the canvas's shapes;
-        # that edited set becomes the new source of truth for this image.
+        # fires when a correction (delete/redraw/undo) changes the canvas's
+        # shapes; that edited set becomes the new source of truth for this image.
         self._last_boxes = list(shapes)
         self._populate_results_table(shapes)
         self.roi_status_label.setText("ROI: full image")
+        self.undo_btn.setEnabled(self.canvas.can_undo())
 
     def _on_correction_mode_toggled(self, checked: bool) -> None:
         self.canvas.set_read_only(not checked)
@@ -373,6 +379,7 @@ class DetectPage(QWidget):
         for btn in self.correction_tool_buttons.values():
             btn.setEnabled(checked)
         self.delete_shape_btn.setEnabled(checked)
+        self.undo_btn.setEnabled(checked and self.canvas.can_undo())
         self.correction_btn.setText("Finish corrections" if checked else "Enable corrections")
         if checked:
             self.canvas.clear_roi()
