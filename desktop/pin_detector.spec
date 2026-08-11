@@ -23,11 +23,15 @@ BACKEND_DIR = REPO_ROOT / "backend"
 
 datas = []
 binaries = []
-# our own backend package (app.services.*, app.schemas, ...) — not
-# statically discoverable by PyInstaller since desktop/main.py only reaches
-# it via a runtime sys.path.insert(), so it's spelled out via pathex below
-# and every submodule is listed explicitly here.
-hiddenimports = collect_submodules("app")
+# Only the parts of the backend the desktop app actually touches:
+# app.schemas, app.config, and app.services.* — not statically discoverable
+# by PyInstaller since desktop/main.py only reaches them via a runtime
+# sys.path.insert(), so they're spelled out via pathex below and listed
+# explicitly here. Deliberately NOT collect_submodules("app") as a whole:
+# that would also pull in app.main and app.routers.* — the FastAPI app and
+# its HTTP routes — which the desktop build has no business bundling. The
+# desktop app is Qt + the plain-Python service layer only, no HTTP server.
+hiddenimports = ["app.schemas", "app.config"] + collect_submodules("app.services")
 
 # ultralytics and opencv both ship non-Python data files (ultralytics' own
 # default config YAMLs, cv2's native libs) and use import patterns
@@ -49,7 +53,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # belt-and-suspenders: nothing the desktop app imports needs these, so
+    # this should be a no-op — but excluding them outright guarantees no
+    # HTTP server code ends up in a "just Qt" desktop build even if a
+    # future change accidentally introduces a transitive import of one.
+    excludes=["fastapi", "starlette", "uvicorn", "multipart", "app.main", "app.routers"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

@@ -373,6 +373,14 @@ yourself? `desktop\build_exe.py` (also has its own **"Build desktop .exe"**
 PyCharm run configuration) and `desktop\pin_detector.spec` do the same
 build — the `.bat` file just calls the same spec file.
 
+This is a **Qt-only build — no FastAPI, no HTTP server, no web framework
+of any kind ends up in the `.exe`**. `backend/requirements.txt` lists
+FastAPI too (the web app needs it), but the spec deliberately only bundles
+`app.schemas`, `app.config`, and `app.services.*` — the plain-Python layer
+the desktop UI actually calls in-process — and explicitly excludes
+`app.main`/`app.routers.*` (the FastAPI app and its HTTP routes) so they
+can't sneak in even by accident.
+
 This build hasn't been run end-to-end on Windows — PyInstaller output is
 genuinely platform-specific, so if the first attempt hits a "module not
 found" error at runtime, it's almost always fixed by adding that module's
